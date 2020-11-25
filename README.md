@@ -14,7 +14,6 @@ trackplot(
   loci = "chr3:187,715,903-187,752,003",
   draw_gene_track = TRUE,
   build = "hg38",
-  gene = "BCL6",
   mark_regions = data.frame(chr = "chr3", start = 187743255, end = 187747473),
   custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
 )
@@ -25,27 +24,22 @@ trackplot(
 
 ### Features
 
- * Fast - Above example plot took less than a minute. 
+ * Fast - Above example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB). 
  * Automatically queries UCSC genome browser for gene models.
  * Supports GTF and standard UCSC gene formats as well.
  * Customization: Each track can be customized for color, scale, and width.
+ * Minimal dependency. Plots are generated in pure base R graphics. 
 
 ### Dependencies
 
 `trackplot` has only two dependencies. 
 
-* [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package which itself has no dependency.
-* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; /usr/local/bin). If you have trouble installing the tool, follow [these](https://github.com/CRG-Barcelona/bwtool/issues/49#issuecomment-604477559) instructions. 
-
- 
-### Caveat
-
- * Windows OS is not supported
- 
-![](https://giphy.com/gifs/cKJjGbH7R5KKcJIR5u/html5)
- 
+* [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
+* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). If you have trouble installing the tool, follow [these](https://github.com/CRG-Barcelona/bwtool/issues/49#issuecomment-604477559) instructions. 
  
 ### Arguments
+
+Available arguments
 
 ```r
 #' @param bigWigs bigWig files. Default NULL. Required.
@@ -72,3 +66,9 @@ trackplot(
 #' @param mark_regions genomic regions to highlight. A data.frame with three columns containing chr, start and end positions.
 #' @param regions_track_width Default 1
 ```
+
+### Caveat
+
+ * Windows OS is not supported
+ 
+![](https://media.giphy.com/media/cKJjGbH7R5KKcJIR5u/giphy.gif)
