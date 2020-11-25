@@ -1,6 +1,8 @@
+## Introduction
+
 `trackplot.R` is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
 
-Usage: 
+### Usage
 
 ```r
 download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
@@ -21,14 +23,14 @@ trackplot(
 <img src="example.png" /></a>
 
 
-Features:
+### Features
 
  * Fast - Above example plot took less than a minute. 
  * Automatically queries UCSC genome browser for gene models.
  * Supports GTF and standard UCSC gene formats as well.
  * Customization: Each track can be customized for color, scale, and width.
 
-Dependencies:
+### Dependencies
 
 `trackplot` has only two dependencies. 
 
@@ -36,14 +38,14 @@ Dependencies:
 * [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; /usr/local/bin). If you have trouble installing the tool, follow [these](https://github.com/CRG-Barcelona/bwtool/issues/49#issuecomment-604477559) instructions. 
 
  
-Caveat: 
- * Does not work on Windows
- 
- <iframe src="https://giphy.com/embed/horLL8A3AiIW08HRsk" width="480" height="290" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/news-donald-trump-no-nothing-that-basically-means-windows-horLL8A3AiIW08HRsk">via GIPHY</a></p>
- 
+### Caveat
 
-
-Arguments:
+ * Windows OS is not supported
+ 
+![](https://giphy.com/gifs/cKJjGbH7R5KKcJIR5u/html5)
+ 
+ 
+### Arguments
 
 ```r
 #' @param bigWigs bigWig files. Default NULL. Required.

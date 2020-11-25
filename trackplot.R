@@ -500,11 +500,11 @@ trackplot = function(bigWigs = NULL,
 
 
 #Test
-.run_test = function(){
-  bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "bw", full.names = TRUE)
-  qregion = "chr3:187,439,165-187,463,513"
-  region = data.frame(chr = c("chr3"), start = c(187452998), end = c(187454879))
-  gm = "~/Downloads/hg19.gtf.gz"
-  #with highlight
-  trackplot(bigWigs = bigWigs, loci = qregion, gene_model = gm, draw_gene_track = TRUE, show_axis = FALSE, mark_regions = region, gene = "BCL6", gene_track_width = 2)
-}
+# .run_test = function(){
+#   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "bw", full.names = TRUE)
+#   qregion = "chr3:187,439,165-187,463,513"
+#   region = data.frame(chr = c("chr3"), start = c(187452998), end = c(187454879))
+#   gm = "~/Downloads/hg19.gtf.gz"
+#   #with highlight
+#   trackplot(bigWigs = bigWigs, loci = qregion, gene_model = gm, draw_gene_track = TRUE, show_axis = FALSE, mark_regions = region, gene = "BCL6", gene_track_width = 2)
+# }
