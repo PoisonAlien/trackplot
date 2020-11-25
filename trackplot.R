@@ -7,7 +7,8 @@
 #' @param nthreads Default 1.
 #' @param binsize bin size to extract signal. Default 50 (bpbs).
 #' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
-#' @param gene_model File with UCSC gene model. Default NULL, automatically fetches gene models from UCSC server
+#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. Default NULL, automatically fetches gene models from UCSC server
+#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
 #' @param tx transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
 #' @param gene gene name to draw. Default NULL. Plots all genes overlapping with the queried region
 #' @param gene_fsize Font size. Default 0.8
@@ -31,6 +32,7 @@ trackplot = function(bigWigs = NULL,
                   binsize = 50,
                   draw_gene_track = FALSE,
                   gene_model = NULL,
+                  isGTF = FALSE,
                   tx = NULL,
                   gene = NULL,
                   gene_fsize = 0.8,
@@ -94,6 +96,7 @@ trackplot = function(bigWigs = NULL,
     end = end,
     draw_gene_track = draw_gene_track,
     gene_model = gene_model,
+    gtf = isGTF,
     query_ucsc = query_ucsc,
     col = col,
     autoscale = groupAutoScale,
@@ -197,7 +200,7 @@ trackplot = function(bigWigs = NULL,
   summary_list
 }
 
-.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, regions = NULL, region_width = 1){
+.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, gtf = FALSE, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, regions = NULL, region_width = 1){
   
   if(length(col) != length(summary_list)){
     col = rep(x = col, length(summary_list))
@@ -247,7 +250,12 @@ trackplot = function(bigWigs = NULL,
         lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))  
       }
     }else{
-      etbl = .extract_geneModel(ucsc_tbl = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)
+      if(gtf){
+        etbl = .parse_gtf(gtf = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
+      }else{
+        etbl = .extract_geneModel(ucsc_tbl = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
+      }
+      
       if(plot_regions){
         lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(region_width, rep(3, ntracks), gene_width, scale_width))
       }else{
@@ -417,12 +425,86 @@ trackplot = function(bigWigs = NULL,
   }
 }
 
+.parse_gtf = function(gtf = NULL, chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
+  message("Parsing gtf file..")
+  gtf = data.table::fread(file = gtf)
+  colnames(gtf) = c("chr", "source", "feature", "start", "end", "ph", "strand", "ph2", "info")
+  gtf[,chr := as.character(chr)]
+  gtf[,start :=as.numeric(as.character(start))]
+  gtf[,end := as.numeric(as.character(end))]
+  data.table::setkey(x = gtf, chr, start, end)
+  
+  query = data.table::data.table(chr, start, end)
+  data.table::setkey(x = query, chr, start, end)
+  
+  gene_models = data.table::foverlaps(x = query, y = gtf, type = "any", nomatch = NULL)
+  
+  if(nrow(gene_models) == 0){
+    warning("No features found within the requested loci!")
+    return(NULL)  
+  }
+  gene_models_exon = gene_models[feature %in% c("exon", "transcript")]
+  #gene_models_rest = gene_models[!feature %in% "exon"]
+  
+  feature_ids = data.table::tstrsplit(x = gene_models_exon$info, split = "; ")
+  feature_id_names = lapply(feature_ids, function(x){
+    #x = x[1:50] #sample rows
+    x = unique(unlist(data.table::tstrsplit(x = x, split = " ", keep = 1)))
+    x = x[complete.cases(x)]
+    x[1]
+  })
+  names(feature_ids) = feature_id_names
+  req_fields = c("gene_id", "transcript_id")
+  req_fields = req_fields[req_fields %in% unlist(feature_id_names)]
+  feature_ids = feature_ids[req_fields]
+  
+  feature_ids = sapply(feature_ids, function(x){
+    gsub(pattern = "\"|;", replacement = "", x = unlist(data.table::tstrsplit(x = x, split = " ", keep = 2)))
+  })
+  feature_ids = data.frame(feature_ids)
+  colnames(feature_ids) = c("gene", "tx")
+  gene_models_exon = cbind(gene_models_exon, feature_ids)
+  #gene_models = data.table::rbindlist(list(gene_models_rest, gene_models_exon), use.names = TRUE, fill = TRUE)
+  gene_models = gene_models_exon[order(as.numeric(as.character(start)))]
+  
+  if(nrow(gene_models) == 0){
+    warning("No features found within the requested loci!")
+    return(NULL)
+  }else{
+    if(!is.null(txname)){
+      gene_models = gene_models[tx %in% txname]
+    }
+    
+    if(!is.null(genename)){
+      gene_models = gene_models[gene %in% genename]
+    }
+    
+    if(nrow(gene_models) == 0){
+      warning("Requested gene or transcript could not be found within the requested loci!")
+      return(NULL)
+    }
+    
+    gene_models = split(gene_models, as.factor(as.character(gene_models$tx)))
+    
+    exon_tbls = lapply(seq_along(along.with = 1:length(gene_models)), function(idx){
+      x = gene_models[[idx]]
+      exon_start = as.numeric(as.character(x[feature %in% "exon"][, start]))
+      exon_end = as.numeric(as.character(x[feature %in% "exon"][, end]))
+      exon_tbl = data.frame(start = exon_start, end = exon_end)
+      attributes(exon_tbl) = list(start = min(x[,start], na.rm = TRUE), end = max(x[,end], na.rm = TRUE), strand = unique(x[,strand]), tx = unique(x[, tx]), gene = unique(x[, gene]))
+      exon_tbl
+    })
+  }
+  exon_tbls
+}
+
 
 #Test
-# .run_test = function(){
-#   bigWigs = list.files(path = "./", pattern = "bw")
-#   qregion = "chr17:7,566,932-7,595,655"
-#   region = data.frame(chr = c("chr17"), start = c(7570000), end = c(7575000))
-#   #with highlight
-#   trackR(bigWigs = bigWigs, loci = qregion, draw_gene_track = TRUE, show_axis = FALSE, mark_regions = region, gene = "TP53", gene_track_width = 2)
-# }
+.run_test = function(){
+  bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "bw", full.names = TRUE)
+  qregion = "chr3:187,439,165-187,463,513"
+  region = data.frame(chr = c("chr3"), start = c(187452998), end = c(187454879))
+  gm = "~/Downloads/hg19.gtf.gz"
+  #with highlight
+  trackplot(bigWigs = bigWigs, loci = qregion, gene_model = gm, draw_gene_track = TRUE, show_axis = FALSE, mark_regions = region, gene = "BCL6", gene_track_width = 2)
+}
