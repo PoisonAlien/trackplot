@@ -264,7 +264,7 @@ trackplot = function(bigWigs = NULL,
     }
   }else{
     if(plot_regions){
-      lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))
+      lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), scale_width))
     }else{
       lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))  
     }
@@ -288,7 +288,6 @@ trackplot = function(bigWigs = NULL,
       plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
       message("No overlapping regions!")
     }
-    
   }
   
   #Draw bigWig signals
