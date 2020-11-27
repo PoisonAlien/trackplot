@@ -5,25 +5,26 @@
 #' @param start start position. Default NULL. This argument is mutually exclusive with `loci`
 #' @param end end interest. Default NULL. This argument is mutually exclusive with `loci`
 #' @param nthreads Default 1.
-#' @param binsize bin size to extract signal. Default 50 (bpbs).
+#' @param binsize bin size to extract signal. Default 50 (bps).
 #' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
 #' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
 #' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
 #' @param tx transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
 #' @param gene gene name to draw. Default NULL. Plots all genes overlapping with the queried region
-#' @param collapse_tx Default TRUE. Whether to collapse all transcripts belonging to same gene into a unified gene model
+#' @param collapse_tx Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
 #' @param gene_fsize Font size. Default 1
-#' @param gene_track_height Default 3 
-#' @param scale_track_height Default 2 
-#' @param query_ucsc Default FALSE. But switches to TREI when `gene_model` is FALSE
-#' @param build Genome build. Default hg19
+#' @param gene_track_height Default 2 
+#' @param scale_track_height Default 1
+#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
+#' @param build Genome build. Default `hg19`
 #' @param col Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track
 #' @param groupAutoScale Default TRUE
 #' @param show_axis Default FALSE
 #' @param custom_names Default NULL and Parses from the file names.
+#' @param custom_names_pos Default 0 (corresponds to left corner)
 #' @param mark_regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
 #' @param mark_regions_col color for highlighted region. Default "#192A561A"
-#' @param mark_regions_col_alpha Default 0.2
+#' @param mark_regions_col_alpha Default 0.5
 #' 
 trackplot = function(bigWigs = NULL,
                   loci = NULL,
@@ -37,18 +38,19 @@ trackplot = function(bigWigs = NULL,
                   isGTF = FALSE,
                   tx = NULL,
                   gene = NULL,
-                  collapse_tx = TRUE,
-                  gene_fsize = 0.8,
-                  gene_track_height = 3,
-                  scale_track_height = 2,
+                  collapse_tx = FALSE,
+                  gene_fsize = 1,
+                  gene_track_height = 2,
+                  scale_track_height = 1,
                   query_ucsc = TRUE,
                   build = "hg19",
                   col = "#2f3640",
                   groupAutoScale = TRUE,
                   show_axis = FALSE,
                   custom_names = NULL,
+                  custom_names_pos = 0, 
                   mark_regions = NULL,
-                  mark_regions_col = "#192A561A",
+                  mark_regions_col = "#f39c12",
                   mark_regions_col_alpha = 0.2
 ){
   
@@ -85,6 +87,12 @@ trackplot = function(bigWigs = NULL,
     }
   }
   
+  if(!is.null(custom_names)){
+    if(length(custom_names) != length(bigWigs)){
+      stop("Please provide names for all bigWigs")
+    }
+  }
+  
   
   .check_bwtool()
   
@@ -109,6 +117,7 @@ trackplot = function(bigWigs = NULL,
     plot_axis = show_axis,
     u_fount = gene_fsize,
     track_names = custom_names,
+    track_names_pos = custom_names_pos,
     regions = mark_regions,
     region_width = 2, 
     build = build,
@@ -205,7 +214,7 @@ trackplot = function(bigWigs = NULL,
   summary_list
 }
 
-.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, gtf = FALSE, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, regions = NULL, region_width = 1, collapse_txs = collapse_tx, boxcol = "#192A561A", boxcolalpha = 0.2){
+.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, gtf = FALSE, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, track_names_pos = 0, regions = NULL, region_width = 1, collapse_txs = collapse_tx, boxcol = "#192A561A", boxcolalpha = 0.2){
   
   if(length(col) != length(summary_list)){
     col = rep(x = col, length(summary_list))
@@ -229,9 +238,6 @@ trackplot = function(bigWigs = NULL,
   }
   
   if(!is.null(track_names)){
-    if(length(track_names) != length(summary_list)){
-      track_names = rep(x = track_names, length(summary_list))
-    }
     names(summary_list) = track_names
   }
   
@@ -257,6 +263,7 @@ trackplot = function(bigWigs = NULL,
           lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))  
         }
       }else{
+        etbl = NULL
         lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))  
       }
     }else{
@@ -320,9 +327,9 @@ trackplot = function(bigWigs = NULL,
             rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
           }else if (idx == 1){
             if(ncol(regions) > 3){
-              text(x = regions[i, startpos], y = plot_height[idx]+1, labels = regions[i, 4], adj = 0, xpd = TRUE, font = 3)
+              text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
             }else{
-              text(x = regions[i, startpos], y = plot_height[idx]+1, labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0, xpd = TRUE, font = 3)
+              text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
             }
             rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
           }else{
@@ -332,12 +339,11 @@ trackplot = function(bigWigs = NULL,
       }
     }
     
-    title(main = names(summary_list)[idx], adj = 0, font.main = 3)
+    title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
   })
   
   #Draw gene models
   if(draw_gene_track){
-    
     if(!is.null(etbl)){
       
       if(collapse_txs){
@@ -345,9 +351,9 @@ trackplot = function(bigWigs = NULL,
       }
       
       if(plot_axis){
-        par(mar = c(0.5, 4, 0, 0.5))
+        par(mar = c(0.25, 4, 0, 0.5))
       }else{
-        par(mar = c(0.5, 1, 0, 0.5))  
+        par(mar = c(0.25, 1, 0, 0.5))  
       }
       
       plot(NA, xlim = c(start, end), ylim = c(0, length(etbl)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
@@ -379,14 +385,18 @@ trackplot = function(bigWigs = NULL,
   }
   
   if(plot_axis){
-    par(mar = c(3, 4, 0, 1))  
+    par(mar = c(0, 4, 0, 0))  
   }else{
-    par(mar = c(3, 1, 0, 1))
+    par(mar = c(0, 1, 0, 0))
   }
   lab_at = pretty(c(start, end))
   plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-  axis(side = 1, at = lab_at, lty = 2, line = 1)
-  text(x = end, y = 0.1, labels = paste0(chr, ":", start, "-", end), adj = 1, xpd = TRUE)
+  rect(xleft = start, ybottom = 0.5, xright = end, ytop = 0.5, lty = 2, xpd = TRUE)
+  rect(xleft = lab_at, ybottom = 0.45, xright = lab_at, ytop = 0.5, xpd = TRUE)
+  text(x = lab_at, y = 0.3, labels = lab_at)
+  
+  #axis(side = 1, at = lab_at, lty = 2, line = -3)
+  text(x = end, y = 0.75, labels = paste0(chr, ":", start, "-", end), adj = 1, xpd = TRUE)
 }
 
 .extract_geneModel = function(ucsc_tbl = NULL, chr = NULL, start = NULL, end = NULL, txname = txname, genename = genename){
@@ -394,23 +404,26 @@ trackplot = function(bigWigs = NULL,
   message("Parsing UCSC file..")
   if(is(object = ucsc_tbl, class2 = "data.frame")){
     ucsc = data.table::as.data.table(ucsc_tbl)
-  }else if(file.exists(gtf)){
+  }else if(file.exists(ucsc_tbl)){
     ucsc = data.table::fread(file = ucsc_tbl)  
   }else{
     stop("Gene model must be a file or a data.frame")
   }
   
   query = data.table::data.table(chr, start, end)
+  query[,chr := as.character(chr)]
+  query[,start := as.numeric(as.character(start))]
+  query[,end := as.numeric(as.character(end))]
   data.table::setkey(x = query, chr, start, end)
   
   colnames(ucsc)[c(3, 5, 6)] = c("chr", "start", "end")
   data.table::setkey(x = ucsc, chr, start, end)
   
-  gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any")
+  gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)
   
   if(nrow(gene_models) == 0){
-    warning("No features found within the requested loci!")
-    return(NULL)
+    message("No features found within the requested loci! If you are not sure why..\n    1.Make sure there are no discripancies in chromosome names i.e, chr prefixes\n")
+    return(NULL)  
   }else{
     if(!is.null(txname)){
       gene_models = gene_models[name %in% txname]
@@ -445,11 +458,11 @@ trackplot = function(bigWigs = NULL,
   query = data.table::data.table(chr, start, end)
   data.table::setkey(x = query, chr, start, end)
   
-  gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any")
+  gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)
   
   if(nrow(gene_models) == 0){
-    warning("No features found within the requested loci!")
-    return(NULL)
+    message("No features found within the requested loci! If you are not sure why..\n    1.Make sure there are no discripancies in chromosome names i.e, chr prefixes\n")
+    return(NULL) 
   }else{
     
     if(!is.null(txname)){
@@ -580,15 +593,22 @@ trackplot = function(bigWigs = NULL,
 
 
 #Test
-.run_test = function(){
-  bigWigs = list.files(path = "../../EPIC_TALL/data/BLUEPRINT/H3K27ac/bigWigs/", pattern = "bw", full.names = TRUE)
-  bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
-  trackplot(
-    bigWigs = bigWigs,
-    loci = "chr3:187,715,903-187,752,003",
-    draw_gene_track = TRUE,
-    build = "hg38",
-    mark_regions = data.frame(chr = "chr3", start = 187743255, end = 187747473),
-    custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
-  )
-}
+# .run_test = function(){
+#   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
+#   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
+#   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
+#   markregions = data.frame(
+#     chr = c("chr3", "chr3"),
+#     start = c(187743255, 187735888),
+#     end = c(187747473, 187736777),
+#     name = c("Promoter-1", "Promoter-2")
+#   )
+#   trackplot(
+#     bigWigs = bigWigs,
+#     loci = "chr3:187,715,903-187,752,003",
+#     draw_gene_track = TRUE,
+#     build = "hg38",
+#     mark_regions = markregions,
+#     custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+#   )
+# }
