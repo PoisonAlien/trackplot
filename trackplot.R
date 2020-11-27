@@ -1,3 +1,9 @@
+#trackplot.R is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
+#Source code: https://github.com/PoisonAlien/trackplot
+
+#MIT License
+#Copyright (c) 2018 Anand Mayakonda <anandmt3@gmail.com>
+
 #' Generate IGV style locus tracks with ease
 #' @param bigWigs bigWig files. Default NULL. Required.
 #' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003

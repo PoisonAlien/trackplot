@@ -53,7 +53,7 @@ trackplot(
 `trackplot` has only two dependencies. 
 
 * [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
-* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). If you have trouble installing the tool, follow [these](https://github.com/CRG-Barcelona/bwtool/issues/49#issuecomment-604477559) instructions. 
+* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). If you have trouble installing the tool, follow [these](https://github.com/CRG-Barcelona/bwtool/issues/49#issuecomment-604477559) instructions. Optionally pre-built binaries are also included. 
  
 ### Arguments
 
