@@ -4,6 +4,8 @@
 
 ### Usage
 
+`trackplot` is a standalone R script and requires no installation. Just source it and you're good to go! See below for dependencies.
+
 ```r
 download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
 source('trackplot.R') 
@@ -42,7 +44,7 @@ trackplot(
 
 ### Features
 
- * Fast - Above example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
+ * Its fast since most of the heavy lifting is done by `bwtool`. Above example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
  * Automatically queries UCSC genome browser for gene models.
  * Supports GTF and standard UCSC gene formats as well.
  * Customization: Each track can be customized for color, scale, and width.
@@ -62,31 +64,28 @@ Available arguments
 ```r
 #' Generate IGV style locus tracks with ease
 #' @param bigWigs bigWig files. Default NULL. Required.
-#' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003
-#' @param chr chromosome of interest. Default NULL. This argument is mutually exclusive with `loci`
-#' @param start start position. Default NULL. This argument is mutually exclusive with `loci`
-#' @param end end interest. Default NULL. This argument is mutually exclusive with `loci`
-#' @param nthreads Default 1.
+#' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
 #' @param binsize bin size to extract signal. Default 50 (bps).
 #' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
-#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
-#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
+#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
+#' @param build Genome build. Default `hg19`
 #' @param tx transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
 #' @param gene gene name to draw. Default NULL. Plots all genes overlapping with the queried region
 #' @param collapse_tx Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
+#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
+#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
+#' @param groupAutoScale Default TRUE
 #' @param gene_fsize Font size. Default 1
 #' @param gene_track_height Default 2 
 #' @param scale_track_height Default 1
-#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given.
-#' @param build Genome build. Default `hg19`
 #' @param col Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track
-#' @param groupAutoScale Default TRUE
 #' @param show_axis Default FALSE
 #' @param custom_names Default NULL and Parses from the file names.
 #' @param custom_names_pos Default 0 (corresponds to left corner)
 #' @param mark_regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
 #' @param mark_regions_col color for highlighted region. Default "#192A561A"
 #' @param mark_regions_col_alpha Default 0.5
+#' @param nthreads Default 1. Number of threads to use.
 ```
 
 ### Caveat
@@ -100,10 +99,7 @@ Available arguments
 
 If you find the script useful consider [citing bwtool](https://academic.oup.com/bioinformatics/article/30/11/1618/282756)
 
-
 *Pohl A, Beato M. bwtool: a tool for bigWig files. Bioinformatics. 2014 Jun 1;30(11):1618-9. doi: 10.1093/bioinformatics/btu056. Epub 2014 Jan 30. PMID: [24489365](https://pubmed.ncbi.nlm.nih.gov/24489365/); PMCID: PMC4029031.*
-
-
 
 ### Acknowledgements 
 

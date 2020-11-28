@@ -1,81 +1,84 @@
-#trackplot.R is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
-#Source code: https://github.com/PoisonAlien/trackplot
+# trackplot.R is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
+# Source code: https://github.com/PoisonAlien/trackplot
 
-#MIT License
-#Copyright (c) 2018 Anand Mayakonda <anandmt3@gmail.com>
+# MIT License
+# Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
+
+# Version: 1.0.0
 
 #' Generate IGV style locus tracks with ease
 #' @param bigWigs bigWig files. Default NULL. Required.
-#' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003
-#' @param chr chromosome of interest. Default NULL. This argument is mutually exclusive with `loci`
-#' @param start start position. Default NULL. This argument is mutually exclusive with `loci`
-#' @param end end interest. Default NULL. This argument is mutually exclusive with `loci`
-#' @param nthreads Default 1.
+#' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
 #' @param binsize bin size to extract signal. Default 50 (bps).
 #' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
-#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
-#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
+#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
+#' @param build Genome build. Default `hg19`
 #' @param tx transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
 #' @param gene gene name to draw. Default NULL. Plots all genes overlapping with the queried region
 #' @param collapse_tx Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
+#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
+#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
+#' @param groupAutoScale Default TRUE
 #' @param gene_fsize Font size. Default 1
 #' @param gene_track_height Default 2 
 #' @param scale_track_height Default 1
-#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
-#' @param build Genome build. Default `hg19`
 #' @param col Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track
-#' @param groupAutoScale Default TRUE
 #' @param show_axis Default FALSE
 #' @param custom_names Default NULL and Parses from the file names.
 #' @param custom_names_pos Default 0 (corresponds to left corner)
 #' @param mark_regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
 #' @param mark_regions_col color for highlighted region. Default "#192A561A"
 #' @param mark_regions_col_alpha Default 0.5
+#' @param nthreads Default 1. Number of threads to use.
 #' 
 trackplot = function(bigWigs = NULL,
                   loci = NULL,
-                  chr = NULL,
-                  start = NULL,
-                  end = NULL,
-                  nthreads = 1,
                   binsize = 50,
                   draw_gene_track = FALSE,
-                  gene_model = NULL,
-                  isGTF = FALSE,
+                  query_ucsc = TRUE,
+                  build = "hg19",
                   tx = NULL,
                   gene = NULL,
                   collapse_tx = FALSE,
+                  gene_model = NULL,
+                  isGTF = FALSE,
+                  groupAutoScale = TRUE,
                   gene_fsize = 1,
                   gene_track_height = 2,
                   scale_track_height = 1,
-                  query_ucsc = TRUE,
-                  build = "hg19",
                   col = "#2f3640",
-                  groupAutoScale = TRUE,
                   show_axis = FALSE,
                   custom_names = NULL,
                   custom_names_pos = 0, 
                   mark_regions = NULL,
                   mark_regions_col = "#f39c12",
-                  mark_regions_col_alpha = 0.2
+                  mark_regions_col_alpha = 0.2,
+                  nthreads = 1
 ){
+
+  if(Sys.info()["sysname"] == "Windows"){
+    stop("Windows is not supported :(")
+  }
   
   options(warn = -1)
+  op_dir = tempdir() #For now
+
+  .check_bwtool()
+  
+  if(!requireNamespace("data.table", quietly = TRUE)){
+    message("Could not find data.table library. Attempting to install..")
+    install.packages("data.table")
+  }
   
   message("Parsing loci..")
-  if(!is.null(loci)){
+  if(is.null(loci)){
+    stop("Missing loci. Provide a target region to plot.\n  Should be of format \"chr:start-end\". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003")
+  }else{
     chr = as.character(unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 1)))
     start = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 2)), split = "-"))[1]
     start = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(start))))
     end = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 2)), split = "-"))[2]
     end = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(end))))
-  }else{
-    if(any(is.null(chr), is.null(start), is.null(end))){
-      stop("Provide a target region to plot. Use argument loci or chr, start, end")
-    }
-    chr = as.character(chr)
-    start = as.numeric(as.character(start))
-    end = as.numeric(as.character(end))
   }
   
   if(start >= end){
@@ -99,10 +102,6 @@ trackplot = function(bigWigs = NULL,
     }
   }
   
-  
-  .check_bwtool()
-  
-  op_dir = tempdir() #For now
   windows = .gen_windows(chr = chr, start = start, end = end, window_size = binsize, op_dir = op_dir)
   signals = .get_summaries(bedSimple = windows, bigWigs = bigWigs, op_dir = op_dir, nthreads = nthreads)
   .plot_track(
@@ -158,7 +157,7 @@ trackplot = function(bigWigs = NULL,
       return(invisible(0))
     }
   }else{
-    stop("Could not locate mysql.\nInstall:\n apt install mysql-server\n yum install mysql-server\n conda install -c anaconda mysql")
+    stop("Could not locate mysql.\nInstall:\n apt install mysql-server [Debian]\n yum install mysql-server [centOS]\n brew install mysql [macOS]\n conda install -c anaconda mysql [conda]")
   }
 }
 
@@ -209,8 +208,13 @@ trackplot = function(bigWigs = NULL,
     x = data.table::fread(x)
     colnames(x)[1] = 'chromosome'
     x = x[,.(chromosome, start, end, size, max)]
+    if(all(is.na(x[,max]))){
+      message("No signal! Possible cause: chromosome name mismatch between bigWigs and queried loci.")
+      x[, max := 0]
+    }
     x
   })
+  
   
   #Remove intermediate files
   lapply(summaries, function(x) system(command = paste0("rm ", x), intern = TRUE))
@@ -261,7 +265,7 @@ trackplot = function(bigWigs = NULL,
     if(is.null(gene_model)){
       if(query_ucsc){
         message("Missing gene model. Trying to query UCSC genome browser..")
-        etbl = .extract_geneModel_ucsc(chr = chr, start = start, end = end, refBuild = build, txname = txname, genename = genename)
+        etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = txname, genename = genename)
         if(plot_regions){
           #lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(region_width, rep(3, ntracks), gene_width, scale_width))
           lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))
@@ -351,7 +355,6 @@ trackplot = function(bigWigs = NULL,
   #Draw gene models
   if(draw_gene_track){
     if(!is.null(etbl)){
-      
       if(collapse_txs){
         etbl = .collapse_tx(etbl)
       }
@@ -454,14 +457,29 @@ trackplot = function(bigWigs = NULL,
 .extract_geneModel_ucsc = function(chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
   .check_mysql()
   op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
-  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", chr, "\"'")
-  message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  
+  if(!grepl(pattern = "^chr", x = chr)){
+    message("Adding chr prefix to target chromosome for UCSC query..")
+    tar_chr = paste0("chr", chr)
+  }else{
+    tar_chr = chr
+  }
+  
+  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
+  message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
+  if(nrow(ucsc) == 0){
+    message("No features found within the requested loci!")
+    return(NULL)
+  }
   colnames(ucsc) = c("chr", "start", "end", "strand", "name", "name2", "exonStarts", "exonEnds")
+  if(!grepl(pattern = "^chr", x = chr)){
+    ucsc[, chr := gsub(pattern = "^chr", replacement = "", x = chr)]
+  }
   data.table::setkey(x = ucsc, chr, start, end)
   
-  query = data.table::data.table(chr, start, end)
+  query = data.table::data.table(chr = chr, start = start, end = end)
   data.table::setkey(x = query, chr, start, end)
   
   gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)
@@ -475,8 +493,18 @@ trackplot = function(bigWigs = NULL,
       gene_models = gene_models[name %in% txname]
     }
     
+    if(nrow(gene_models) == 0){
+      message("    Requested transcript ", txname, " does not exist within the queried region!\n    Skipping gene track plotting..")
+      return(NULL)
+    }
+    
     if(!is.null(genename)){
       gene_models = gene_models[name2 %in% genename]
+    }
+    
+    if(nrow(gene_models) == 0){
+      message("    Requested gene ", genename, " does not exist within the queried region!\n    Skipping gene track plotting..")
+      return(NULL)
     }
     
     exon_tbls = lapply(seq_along(along.with = 1:nrow(gene_models)), function(idx){
@@ -603,18 +631,22 @@ trackplot = function(bigWigs = NULL,
 #   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
 #   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
 #   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
-#   markregions = data.frame(
-#     chr = c("chr3", "chr3"),
-#     start = c(187743255, 187735888),
-#     end = c(187747473, 187736777),
-#     name = c("Promoter-1", "Promoter-2")
-#   )
-#   trackplot(
-#     bigWigs = bigWigs,
-#     loci = "chr3:187,715,903-187,752,003",
-#     draw_gene_track = TRUE,
-#     build = "hg38",
-#     mark_regions = markregions,
-#     custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
-#   )
+# markregions = data.frame(
+#   chr = c("chr3", "chr3"),
+#   start = c(187743255, 187735888),
+#   end = c(187747473, 187736777),
+#   name = c("Promoter-1", "Promoter-2")
+# )
+# trackplot(
+#   bigWigs = bigWigs,
+#   loci = "chr3:187,715,903-187,752,003",
+#   draw_gene_track = TRUE,
+#   build = "hg38",
+#   mark_regions = markregions,
+#   custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+# )
 # }
+
+# Release Notes:
+# Version: 1.0.0 [2020-11-27]
+#   * Initial release
