@@ -1,10 +1,22 @@
-# trackplot.R is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
+# This R script contains two functions namely trackplot() and profileplot() for bigWig visualization
+#
+# trackplot() is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
+# profileplot() is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files.
+#
 # Source code: https://github.com/PoisonAlien/trackplot
-
+#
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
+#
+# Version: 1.1.0
+#
+# Release Notes:
+# Version: 1.0.0 [2020-11-27]
+#   * Initial release
+# Version: 1.1.0 [2020-12-01]
+#   * Added profileplot()
 
-# Version: 1.0.0
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #' Generate IGV style locus tracks with ease
 #' @param bigWigs bigWig files. Default NULL. Required.
@@ -288,26 +300,6 @@ trackplot = function(bigWigs = NULL,
   }else{
     lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))  
   }
-  
-  
-  #Draw BED regions from `mark_regions`
-  # if(plot_regions){
-  #   if(plot_axis){
-  #     par(mar = c(0.5, 4, 2, 1))
-  #   }else{
-  #     par(mar = c(0.5, 1, 2, 1))  
-  #   }
-  #   if(nrow(regions) > 0){
-  #     plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-  #     for(i in 1:nrow(regions)){
-  #       rect(xleft = regions[i, startpos], ybottom = i-0.75, xright = regions[i, endpos], ytop = i-0.25, col = "#192a56", border = "#192a56")
-  #       text(x = regions[i, endpos], y = i-0.5, labels = paste0(regions[i, chromsome], ":", regions[i, startpos], "-", regions[i, endpos]), adj = -0.05, xpd = TRUE)
-  #     }
-  #   }else{
-  #     plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-  #     message("No overlapping regions!")
-  #   }
-  # }
   
   #Draw bigWig signals
   lapply(1:length(summary_list), function(idx){
@@ -625,9 +617,321 @@ trackplot = function(bigWigs = NULL,
   exon_tbls
 }
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# profileplot is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files
+
+#' Generate profile plots with ease
+#' @param bigWigs bigWig files. Default NULL. Required.
+#' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
+#' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
+#' @param startFrom Default "center". Can be "center", "start" or "end"
+#' @param up extend upstream by this many bps from `startFrom`. Default 2500
+#' @param down extend downstream by this many bps from `startFrom`. Default 2500
+#' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'
+#' @param nthreads Default 4
+#' @param custom_names Default NULL and Parses from the file names.
+#' @param color Manual colors for each bigWig. Default NULL. 
+#' @param condition Default. Condition associated with each bigWig. Lines will colord accordingly.
+#' @param condition_colors Manual colors for each level in condition. Default NULL. 
+#' @param collapse_replicates Default FALSE. If TRUE and when `condition` is given, collapse signals samples belonging to same condition
+#' @param plot_se Default FALSE. If TRUE plots standard error shading
+#' @param line_size Default 1
+#' @param legend_fs Legend font size. Default 1
+#' @param axis_fs Axis font size. Default 1
+#' 
+profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "center",
+                       up = 2500, down = 2500, ucsc_assembly = NULL, nthreads = 4, 
+                       custom_names = NULL, color = NULL, condition = NULL, condition_colors = NULL, 
+                       collapse_replicates = FALSE, plot_se = FALSE, line_size = 1, legend_fs = 1, axis_fs = 1){
+  
+  if(is.null(bigWigs)){
+    stop("Provide at-least one bigWig file")
+  }
+  
+  message("Checking for files..")
+  for(i in 1:length(bigWigs)){
+    if(!file.exists(as.character(bigWigs)[i])){
+      stop(paste0(as.character(bigWigs)[i], " does not exist!"))
+    }
+  }
+  
+  if(!is.null(custom_names)){
+    if(length(custom_names) != length(bigWigs)){
+      stop("Please provide names for all bigWigs")
+    }
+  }
+  
+  .check_bwtool()
+  op_dir = tempdir() #For now
+  
+  if(is.null(color)){
+    color = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", 
+              "#A6761D", "#666666")
+    color = color[1:length(bigWigs)]
+  }
+  
+  if(is.null(bed)){
+    if(is.null(ucsc_assembly)){
+      stop("Please provide either a BED file or ucsc_assembly name")
+    }else{
+      if(length(ucsc_assembly) > 1){
+        warning("Multiple assemblies provided. Using first one..")
+        ucsc_assembly = ucsc_assembly[1]
+      }
+      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir)
+    }
+  }else{
+    startFrom = match.arg(arg = startFrom, choices = c("start", "end", "center"))
+    bed = .make_bed(bed = bed, op_dir = op_dir, up = as.numeric(up), down = as.numeric(up), tss = startFrom)
+  }
+  
+  message("Extracting signals..")
+  mats = parallel::mclapply(bigWigs, function(x){
+    .bwt_mats(bw = x, binSize = binSize, bed = bed, size = paste0(up, ":", down), startFrom = startFrom, op_dir = op_dir)
+  }, mc.cores = nthreads)
+  
+  mats = as.character(unlist(x = mats))
+  sig_list = lapply(mats, data.table::fread)
+  
+  if(!is.null(custom_names)){
+    names(sig_list) = custom_names
+  }else{
+    names(sig_list) = gsub(pattern = "*\\.matrix$", replacement = "", x = basename(path = mats))
+  }
+  #return(sig_list)
+  
+  #Remove intermediate files
+  lapply(mats, function(x) system(command = paste0("rm ", x), intern = TRUE))
+  
+  message("Summarizing..")
+  sig_se_summary = NULL
+  sig_summary = .summarizeMats(mats = sig_list, group = condition, collapse_reps = collapse_replicates)
+  if(plot_se){
+    sig_se_summary = .estimateCI(mats = sig_list, group = condition, collapse_reps = collapse_replicates)
+  }
+  
+  if(!is.null(condition)){
+    group_df = data.table::data.table(sample = names(sig_summary), condition = condition)
+    if(is.null(condition_colors)){
+      condition_colors = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", 
+                           "#A6761D", "#666666")[1:nrow(group_df[,.N,condition])]
+    }
+    names(condition_colors) = group_df[,.N,condition][,condition]
+    color = condition_colors[group_df$condition]
+  }
+  
+  y_max = max(unlist(lapply(sig_summary, max, na.rm = TRUE)))
+  y_min = min(unlist(lapply(sig_summary, min, na.rm = TRUE)))
+  ylabs = pretty(c(y_min, y_max), n = 5)
+  
+  x_max = max(unlist(lapply(sig_summary, length)))
+  xlabs = c(up, 0, down)
+  xticks = xticks = c(0,
+                      as.integer(length(sig_summary[[1]])/sum(as.numeric(xlabs[1]), as.numeric(xlabs[3])) * as.numeric(xlabs[1])),
+                      length(sig_summary[[1]]))
+  
+  #line_size = 1
+  par(mar = c(3, 3, 2, 1))
+  plot(NA, xlim = c(0, x_max), ylim = c(min(ylabs), max(ylabs)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+  abline(h = ylabs, v = pretty(xticks), col = "gray90", lty = 2)
+  
+  lapply(1:length(sig_summary), function(idx){
+    points(sig_summary[[idx]], type = 'l', lwd = line_size, col = color[idx])
+    if(plot_se){
+      polygon(x = c(1:length(sig_summary[[idx]]), rev(1:length(sig_summary[[idx]]))),
+              y = c(sig_summary[[idx]]-sig_se_summary[[idx]], rev(sig_summary[[idx]]+sig_se_summary[[idx]])),
+              col = grDevices::adjustcolor(col = color[idx], #color[names(mat_list)[[i]]],
+                                           alpha.f = 0.4), border = NA)
+    }
+  })
+  axis(side = 1, at = xticks, labels = xlabs, cex.axis = axis_fs)
+  axis(side = 2, at = ylabs, las = 2, cex.axis = axis_fs)
+  
+  if(!is.null(condition)){
+    legend(x = "topright", legend = unique(names(color)), col = unique(color), bty = "n", lty = 1, lwd = 1.2, cex = legend_fs, xpd = TRUE)
+  }else{
+    legend(x = "topright", legend = names(sig_summary), col = color, bty = "n", lty = 1, lwd = 1.2, cex = legend_fs, xpd = TRUE)
+  }
+  
+  invisible(list(mean_signal = sig_summary, std_err = sig_se_summary, color_codes = color, xticks = xticks, xlabs = xlabs))
+  
+}
+
+.make_genome_bed = function(refBuild = "hg19", tss = "start", up = 2500, down = 2500, op_dir = tempdir(), pc_genes = TRUE){
+  if(!dir.exists(paths = op_dir)){
+    dir.create(path = op_dir, showWarnings = FALSE, recursive = TRUE)
+  }
+  
+  tss = match.arg(arg = tss, choices = c("start", "end"))
+  
+  temp_op_bed = tempfile(pattern = "profileplot_ucsc", tmpdir = op_dir, fileext = ".bed")
+  
+  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
+  message(paste0("Extracting gene models from UCSC:\n", "    build: ", refBuild, "\n    query: ", cmd))
+  #system(command = cmd)
+  ucsc = data.table::fread(cmd = cmd)
+  colnames(ucsc) = c("chr", "start", "end", "strand", "tx_id", "gene_id")
+  
+  main_contigs = paste0("chr", c(1:22, "X", "Y"))
+  ucsc = ucsc[chr %in% main_contigs]
+  
+  message("Fetched ", nrow(ucsc), " transcripts from ", nrow(ucsc[,.N,.(chr)]), " contigs")
+  
+  if(tss == "end"){
+    colnames(ucsc)[2:3] = c("end", "start")
+  }
+  
+  ucsc_minus = ucsc[strand %in% "-"]
+  if(nrow(ucsc_minus) > 0){
+    ucsc_minus[, bed_start := end-up]
+    ucsc_minus[, bed_end := end+down]
+  }
+  
+  ucsc_plus = ucsc[strand %in% "+"]
+  if(nrow(ucsc_plus) > 0){
+    ucsc_plus[, bed_start := start-up]
+    ucsc_plus[, bed_end := start+down]
+  }
+  
+  ucsc_bed = data.table::rbindlist(l = list(ucsc_plus[, .(chr, bed_start, bed_end)], ucsc_minus[, .(chr, bed_start, bed_end)]), use.names = TRUE, fill = TRUE)
+  colnames(ucsc_bed) = c("chr", "start", "end")
+  data.table::setkey(x = ucsc_bed, chr, start, end)
+  
+  data.table::fwrite(x = ucsc_bed[,1:3], file = temp_op_bed, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  temp_op_bed
+}
+
+.make_bed = function(bed, op_dir = tempdir(), up = 2500, down = 2500, tss = "center"){
+  #bwtool tool requires only three columns
+  
+  tss = match.arg(arg = tss, choices = c("start", "end", "center"))
+  
+  if(!dir.exists(paths = op_dir)){
+    dir.create(path = op_dir, showWarnings = FALSE, recursive = TRUE)
+  }
+  
+  temp_op_bed = tempfile(pattern = "profileplot", tmpdir = op_dir, fileext = ".bed")
+  
+  if(is.data.frame(bed)){
+    data.table::setDT(x = bed)
+    colnames(bed)[1:3] = c("chr", "start", "end")
+    bed[, chr := as.character(chr)]
+    bed[, start := as.numeric(as.character(start))]
+    bed[, end := as.numeric(as.character(end))]
+  }else if(file.exists(bed)){
+    bed = data.table::fread(file = bed, select = list(character = 1, numeric = c(2, 3)), col.names = c("chr", "start", "end"))
+  }
+  
+  if(tss == "center"){
+    bed[, focal_point := as.integer(apply(bed[,2:3], 1, mean))]
+    bed[, bed_start := focal_point-up]
+    bed[, bed_end := focal_point+down]
+  }else if(tss == "start"){
+    bed[, bed_start := start-up]
+    bed[, bed_end := start+down]
+  }else{
+    bed[, bed_start := end-up]
+    bed[, bed_end := end+down]
+  }
+  
+  data.table::setkey(x = bed, chr, start, end)
+  
+  data.table::fwrite(x = bed[,1:3], file = temp_op_bed, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  return(temp_op_bed)
+}
+
+.bwt_mats = function(bw, binSize, bed, size, startFrom, op_dir){
+  
+  bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "",
+            x = basename(bw), ignore.case = TRUE)
+  message(paste0("Processing ", bn, ".."))
+  
+  bw = gsub(pattern = " ", replacement = "\\ ", x = bw, fixed = TRUE) #Change spaces with \ for unix style paths
+  
+  cmd = paste0("bwtool matrix -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+  system(command = cmd, intern = TRUE)
+  paste0(op_dir, "/", bn, ".matrix")
+}
+
+
+.summarizeMats = function(mats = NULL, summarizeBy = 'mean', group = NULL, collapse_reps = FALSE){
+  
+  if(!is.null(group)){
+    # gdf = data.table::data.table(sample = names(mats), condition = group)
+    # gdf = gdf[order(group, sample)]
+    group_u = unique(group)
+    if(collapse_reps){
+      summarizedMats = lapply(group_u, function(g){
+        x = apply(data.table::rbindlist(l = mats[which(group == g)], fill = TRUE, use.names = TRUE), 2, summarizeBy, na.rm = TRUE)
+        x
+      })
+      names(summarizedMats) = group_u
+    }else{
+      summarizedMats = lapply(mats[1:(length(mats))], function(x){
+        if(!is.null(dim(x))){
+          x = apply(x, 2, summarizeBy, na.rm = TRUE)
+        }
+        x
+      })
+    }
+  }else{
+    summarizedMats = lapply(mats[1:(length(mats))], function(x){
+      if(!is.null(dim(x))){
+        x = apply(x, 2, summarizeBy, na.rm = TRUE)
+      }
+      x
+    })
+  }
+  
+  #summarizedMats$param = mats$param
+  summarizedMats
+}
+
+
+# estimate tandard deviation for CI
+.estimateCI = function(mats = NULL, group = NULL, collapse_reps = FALSE){
+  
+  if(!is.null(group)){
+    if(collapse_reps){
+      group_u = unique(group)
+      ciMats = lapply(group_u, function(g){
+        x = apply(data.table::rbindlist(l = mats[which(group == g)], fill = TRUE, use.names = TRUE), 2, function(y){
+          sd(y, na.rm = TRUE)/sqrt(length(y))
+        })
+        x
+      })
+      names(ciMats) = group_u
+    }else{
+      ciMats = lapply(mats[1:(length(mats))], function(x){
+        if(!is.null(dim(x))){
+          x = apply(x, 2, function(y){
+            sd(y, na.rm = TRUE)/sqrt(length(y))
+          })
+        }
+        x
+      })
+    }
+  }else{
+    ciMats = lapply(mats[1:(length(mats))], function(x){
+      if(!is.null(dim(x))){
+        x = apply(x, 2, function(y){
+          sd(y, na.rm = TRUE)/sqrt(length(y))
+        })
+      }
+      x
+    })
+  }
+  
+  ciMats
+}
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #Test
-# .run_test = function(){
+# .run_test_trackplot = function(){
 #   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
 #   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
 #   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
@@ -647,6 +951,13 @@ trackplot = function(bigWigs = NULL,
 # )
 # }
 
-# Release Notes:
-# Version: 1.0.0 [2020-11-27]
-#   * Initial release
+.run_test_profileplot = function(){
+  bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
+  #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
+  bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
+  bed = "/Volumes/datadrive/bws/trackR/CD34_blacklist_filtered.narrowPeak"
+  
+  profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
+}
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
