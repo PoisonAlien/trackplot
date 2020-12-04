@@ -15,6 +15,8 @@
 #   * Initial release
 # Version: 1.1.0 [2020-12-01]
 #   * Added profileplot()
+# Version: 1.1.1 [2020-12-04]
+#   * trackplot() now plots ideogram of target chromosome
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -42,6 +44,7 @@
 #' @param mark_regions_col color for highlighted region. Default "#192A561A"
 #' @param mark_regions_col_alpha Default 0.5
 #' @param nthreads Default 1. Number of threads to use.
+#' @param show_ideogram Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when `query_ucsc` is TRUE. 
 #' 
 trackplot = function(bigWigs = NULL,
                   loci = NULL,
@@ -65,22 +68,17 @@ trackplot = function(bigWigs = NULL,
                   mark_regions = NULL,
                   mark_regions_col = "#f39c12",
                   mark_regions_col_alpha = 0.2,
-                  nthreads = 1
+                  nthreads = 1,
+                  show_ideogram = TRUE
 ){
 
-  if(Sys.info()["sysname"] == "Windows"){
-    stop("Windows is not supported :(")
-  }
   
+  .check_windows()
   options(warn = -1)
   op_dir = tempdir() #For now
 
   .check_bwtool()
-  
-  if(!requireNamespace("data.table", quietly = TRUE)){
-    message("Could not find data.table library. Attempting to install..")
-    install.packages("data.table")
-  }
+  .check_dt()
   
   message("Parsing loci..")
   if(is.null(loci)){
@@ -140,7 +138,8 @@ trackplot = function(bigWigs = NULL,
     build = build,
     collapse_txs = collapse_tx,
     boxcol = mark_regions_col,
-    boxcolalpha = mark_regions_col_alpha
+    boxcolalpha = mark_regions_col_alpha,
+    show_ideogram = show_ideogram
   )
 }
 
@@ -236,7 +235,7 @@ trackplot = function(bigWigs = NULL,
   summary_list
 }
 
-.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, gtf = FALSE, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, track_names_pos = 0, regions = NULL, region_width = 1, collapse_txs = collapse_tx, boxcol = "#192A561A", boxcolalpha = 0.2){
+.plot_track = function(summary_list, chr, start, end, draw_gene_track = FALSE, gene_model = NULL, gtf = FALSE, query_ucsc = NULL, build = "hg19", col = "gray70", autoscale = TRUE, txname = NULL, genename = NULL, gene_width = 2, scale_width = 1, plot_axis = TRUE, u_fount = 0.6, track_names = NULL, track_names_pos = 0, regions = NULL, region_width = 1, collapse_txs = collapse_tx, boxcol = "#192A561A", boxcolalpha = 0.2, show_ideogram = FALSE){
   
   if(length(col) != length(summary_list)){
     col = rep(x = col, length(summary_list))
@@ -278,9 +277,9 @@ trackplot = function(bigWigs = NULL,
       if(query_ucsc){
         message("Missing gene model. Trying to query UCSC genome browser..")
         etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = txname, genename = genename)
-        if(plot_regions){
+        if(show_ideogram){
           #lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(region_width, rep(3, ntracks), gene_width, scale_width))
-          lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))
+          lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(3, ntracks), gene_width, scale_width, 1))
         }else{
           lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))  
         }
@@ -298,7 +297,11 @@ trackplot = function(bigWigs = NULL,
       lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_width, scale_width))
     }
   }else{
-    lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))  
+    if(all(c(query_ucsc, show_ideogram))){
+      lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), scale_width, 1))  
+    }else{
+      lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_width))    
+    }
   }
   
   #Draw bigWig signals
@@ -366,7 +369,7 @@ trackplot = function(bigWigs = NULL,
         if(is.na(attr(txtbl, "tx"))){
           text(x = start, y = tx_id-0.45, labels = paste0(attr(txtbl, "gene")), adj = 0, cex = u_fount)
         }else{
-          text(x = start, y = tx_id-0.45, labels = paste0(attr(txtbl, "tx"), " [", attr(txtbl, "gene"), "]"), adj = 0, cex = u_fount)  
+          text(x = start, y = tx_id-0.45, labels = paste0(attr(txtbl, "tx"), " [", attr(txtbl, "gene"), "]"), cex = u_fount)  
         }
         
         rect(xleft = txtbl[[1]], ybottom = tx_id-0.75, xright = txtbl[[2]], ytop = tx_id-0.25, col = exon_col, border = NA)
@@ -395,9 +398,22 @@ trackplot = function(bigWigs = NULL,
   rect(xleft = start, ybottom = 0.5, xright = end, ytop = 0.5, lty = 2, xpd = TRUE)
   rect(xleft = lab_at, ybottom = 0.45, xright = lab_at, ytop = 0.5, xpd = TRUE)
   text(x = lab_at, y = 0.3, labels = lab_at)
-  
   #axis(side = 1, at = lab_at, lty = 2, line = -3)
   text(x = end, y = 0.75, labels = paste0(chr, ":", start, "-", end), adj = 1, xpd = TRUE)
+  
+  if(all(c(query_ucsc, show_ideogram))){
+    cyto = .extract_cytoband(chr = chr, refBuild = build)
+    #par(fig = c(0, 1, 0, 0.05), new = TRUE)
+    if(plot_axis){
+      par(mar = c(0, 4, 0, 0))  
+    }else{
+      par(mar = c(0, 1, 0, 0))
+    }
+    plot(NA, xlim = c(0, max(cyto$end)), ylim = c(0, 1), axes = FALSE, frame.plot = FALSE, xlab = NA, ylab = NA)
+    rect(xleft = cyto$start, ybottom = 0.1, xright = cyto$end, ytop = 0.6, col = cyto$color, border = "#34495e")
+    rect(xleft = start, ybottom = 0, xright = end, ytop = 0.7, col = "#d35400", lwd = 2, border = "#d35400")
+    text(x = 0, y = 0.8, labels = chr, adj = 0, font = 2)
+  }
 }
 
 .extract_geneModel = function(ucsc_tbl = NULL, chr = NULL, start = NULL, end = NULL, txname = txname, genename = genename){
@@ -444,6 +460,57 @@ trackplot = function(bigWigs = NULL,
     
     return(exon_tbls)
   }
+}
+
+.extract_cytoband = function(chr = NULL, refBuild = "hg19"){
+  
+  if(!grepl(pattern = "^chr", x = chr)){
+    message("Adding chr prefix to target chromosome for UCSC query..")
+    chr = paste0("chr", chr)
+  }
+  
+  cmd = paste0(
+    "mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",
+    refBuild,
+    " -e 'select chrom, chromStart, chromEnd, name, gieStain from cytoBand WHERE chrom =\"",
+    chr,
+    "\"'"
+  )
+  message(paste0("Extracting cytobands from UCSC:\n", "    chromosome: ", chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  
+  cyto = data.table::fread(cmd = cmd, colClasses = c("character", "numeric", "numeric", "character", "character"))
+  colnames(cyto) = c("chr", "start", "end", "band", "stain")
+  data.table::setkey(x = cyto, chr, start, end)
+  
+  #Color codes from https://github.com/jianhong/trackViewer (Thank you..)
+  ### gieStain #############################
+  # #FFFFFF - gneg    - Giemsa negative bands
+  # #999999 - gpos25  - Giemsa positive bands
+  # #666666 - gpos50  - Giemsa positive bands
+  # #333333 - gpos75  - Giemsa positive bands
+  # #000000 - gpos100 - Giemsa positive bands
+  # #660033 - acen    - centromeric regions
+  # #660099 - gvar    - variable length heterochromatic regions
+  # #6600cc - stalk   - tightly constricted regions on the short arms of
+  #                     the acrocentric chromosomes
+  colorSheme = c(
+    "gneg"    = "#FFFFFF",
+    "acen"    = "#660033",
+    "gvar"    = "#660099",
+    "stalk"   = "#6600CC"
+  )
+  gposCols <- sapply(1:100, function(i){
+    i <- as.hexmode(round(256-i*2.56, digits = 0))
+    i <- toupper(as.character(i))
+    if(nchar(i)==1) i <- paste0("0", i)
+    return(paste0("#", i, i, i))
+  })
+  names(gposCols) <- paste0("gpos", 1:100)
+  colorSheme <- c(gposCols, colorSheme)
+  cyto$color = color_scheme[cyto[,stain]]
+  cyto
+  
+  cyto
 }
 
 .extract_geneModel_ucsc = function(chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
@@ -617,6 +684,18 @@ trackplot = function(bigWigs = NULL,
   exon_tbls
 }
 
+.check_dt = function(){
+  if(!requireNamespace("data.table", quietly = TRUE)){
+    message("Could not find data.table library. Attempting to install..")
+    install.packages("data.table")
+  }
+}
+
+.check_windows = function(){
+  if(Sys.info()["sysname"] == "Windows"){
+    stop("Windows is not supported :(")
+  }
+}
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # profileplot is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files
@@ -645,6 +724,8 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
                        custom_names = NULL, color = NULL, condition = NULL, condition_colors = NULL, 
                        collapse_replicates = FALSE, plot_se = FALSE, line_size = 1, legend_fs = 1, axis_fs = 1){
   
+  .check_windows()
+  
   if(is.null(bigWigs)){
     stop("Provide at-least one bigWig file")
   }
@@ -663,6 +744,8 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   }
   
   .check_bwtool()
+  .checkt_dt()
+  
   op_dir = tempdir() #For now
   
   if(is.null(color)){
@@ -951,13 +1034,13 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 # )
 # }
 
-.run_test_profileplot = function(){
-  bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
-  #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
-  bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
-  bed = "/Volumes/datadrive/bws/trackR/CD34_blacklist_filtered.narrowPeak"
-  
-  profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
-}
+# .run_test_profileplot = function(){
+#   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
+#   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
+#   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
+#   bed = "/Volumes/datadrive/bws/trackR/CD34_blacklist_filtered.narrowPeak"
+#   
+#   profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
+# }
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -11,13 +11,13 @@
 
 ### trackplot()
 
-`trackplot()` is a simple, and minimal dependency R function to generate IGV style track plots (aka locus plots) from bigWig files.
+`trackplot()` is an `R` function to generate IGV style track plots (aka locus plots) from bigWig files.
 
- * Its fast since most of the heavy lifting is done by `bwtool`. Above example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
- * Automatically queries UCSC genome browser for gene models.
+ * Its fast since most of the heavy lifting is done by `bwtool`. Below example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
+ * Automatically queries UCSC genome browser for gene models and cytobands.
  * Supports GTF and standard UCSC gene formats as well.
  * Customization: Each track can be customized for color, scale, and width.
- * Minimal dependency. Plots are generated in pure base R graphics. 
+ * Minimal dependency. Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages). 
 
 ```r
 download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
@@ -55,7 +55,7 @@ trackplot(
 )
 ```
 
-<img src="example.png" /></a>
+![](https://user-images.githubusercontent.com/8164062/101162153-3deae100-3632-11eb-8fad-66706f53ffe8.png)
 
 Available arguments
 
@@ -84,11 +84,12 @@ Available arguments
 #' @param mark_regions_col color for highlighted region. Default "#192A561A"
 #' @param mark_regions_col_alpha Default 0.5
 #' @param nthreads Default 1. Number of threads to use.
+#' @param show_ideogram Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when `query_ucsc` is TRUE. 
 ```
 
 ### profileplot()
 
-`profileplot()` is a simple, and minimal dependency R function to generate profile-plots from bigWig files.
+`profileplot()` is an `R` function to generate density based profile-plots from bigWig files.
 
   * Below example for summarizing approx. 33,250 peaks for 5 bigWig files takes around 90 seconds on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB). This includes generating signal matrix, summarizing, and plotting
   * Optionally, it can even query UCSC genome browser for refseq transcripts of desired assembly and summarize around TSS regions
