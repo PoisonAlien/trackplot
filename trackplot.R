@@ -8,15 +8,17 @@
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
-# Version: 1.1.0
+# Version: 1.1.11
 #
-# Release Notes:
+# Changelog:
 # Version: 1.0.0 [2020-11-27]
 #   * Initial release
 # Version: 1.1.0 [2020-12-01]
 #   * Added profileplot()
 # Version: 1.1.1 [2020-12-04]
 #   * trackplot() now plots ideogram of target chromosome
+# Version: 1.1.11 [2020-12-07]
+#   * Bug fixes in profileplot(): Typo for .check_dt() and startFrom estimation
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -74,11 +76,11 @@ trackplot = function(bigWigs = NULL,
 
   
   .check_windows()
-  options(warn = -1)
-  op_dir = tempdir() #For now
-
   .check_bwtool()
   .check_dt()
+  
+  options(warn = -1)
+  op_dir = tempdir() #For now
   
   message("Parsing loci..")
   if(is.null(loci)){
@@ -725,6 +727,8 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
                        collapse_replicates = FALSE, plot_se = FALSE, line_size = 1, legend_fs = 1, axis_fs = 1){
   
   .check_windows()
+  .check_bwtool()
+  .check_dt()
   
   if(is.null(bigWigs)){
     stop("Provide at-least one bigWig file")
@@ -742,9 +746,6 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
       stop("Please provide names for all bigWigs")
     }
   }
-  
-  .check_bwtool()
-  .checkt_dt()
   
   op_dir = tempdir() #For now
   
@@ -898,7 +899,8 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   temp_op_bed = tempfile(pattern = "profileplot", tmpdir = op_dir, fileext = ".bed")
   
   if(is.data.frame(bed)){
-    data.table::setDT(x = bed)
+    bed = data.table::as.data.table(x = bed)
+    #data.table::setDT(x = bed)
     colnames(bed)[1:3] = c("chr", "start", "end")
     bed[, chr := as.character(chr)]
     bed[, start := as.numeric(as.character(start))]
@@ -918,10 +920,10 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
     bed[, bed_start := end-up]
     bed[, bed_end := end+down]
   }
+  bed = bed[,.(chr, bed_start, bed_end)]
+  data.table::setkey(x = bed, chr, bed_start, bed_end)
   
-  data.table::setkey(x = bed, chr, start, end)
-  
-  data.table::fwrite(x = bed[,1:3], file = temp_op_bed, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+  data.table::fwrite(x = bed, file = temp_op_bed, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
   
   return(temp_op_bed)
 }
@@ -1039,7 +1041,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 #   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
 #   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
 #   bed = "/Volumes/datadrive/bws/trackR/CD34_blacklist_filtered.narrowPeak"
-#   
+# 
 #   profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
 # }
 
