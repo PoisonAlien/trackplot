@@ -1,24 +1,30 @@
 ## Introduction
 
-`trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files. It has two main functions:
+`trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files. 
+It has three main functions:
 
 * `trackplot()` - for IGV style track plots
 * `profileplot()` - for density based profile plots
+* `bwpcaplot()` - PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts.
 
 `trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for dependencies.
+
+Features:
+
+  * It's significantly fast since most of the heavy lifting is done by `bwtool`. Below examples took less than 2 minutes on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
+  * Automatically queries UCSC genome browser for gene models and cytobands, making analysis reproducible.
+  * Supports GTF and standard UCSC gene formats as well.
+  * Lightweight and minimal dependency 
+    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
+    - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
+  * Customization: Each plot can customized for color, scale, width, etc.
 
 ### Usage
 
 ### trackplot()
 
 `trackplot()` is an `R` function to generate IGV style track plots (aka locus plots) from bigWig files.
-
- * Its fast since most of the heavy lifting is done by `bwtool`. Below example plot took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
- * Automatically queries UCSC genome browser for gene models and cytobands.
- * Supports GTF and standard UCSC gene formats as well.
- * Customization: Each track can be customized for color, scale, and width.
- * Minimal dependency. Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages). 
-
+ 
 ```r
 download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
 source('trackplot.R') 
@@ -57,36 +63,6 @@ trackplot(
 
 ![](https://user-images.githubusercontent.com/8164062/101162153-3deae100-3632-11eb-8fad-66706f53ffe8.png)
 
-Available arguments
-
-```r
-#' Generate IGV style locus tracks with ease
-#' @param bigWigs bigWig files. Default NULL. Required.
-#' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
-#' @param binsize bin size to extract signal. Default 50 (bps).
-#' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
-#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
-#' @param build Genome build. Default `hg19`
-#' @param tx transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
-#' @param gene gene name to draw. Default NULL. Plots all genes overlapping with the queried region
-#' @param collapse_tx Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
-#' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
-#' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
-#' @param groupAutoScale Default TRUE
-#' @param gene_fsize Font size. Default 1
-#' @param gene_track_height Default 2 
-#' @param scale_track_height Default 1
-#' @param col Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track
-#' @param show_axis Default FALSE
-#' @param custom_names Default NULL and Parses from the file names.
-#' @param custom_names_pos Default 0 (corresponds to left corner)
-#' @param mark_regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
-#' @param mark_regions_col color for highlighted region. Default "#192A561A"
-#' @param mark_regions_col_alpha Default 0.5
-#' @param nthreads Default 1. Number of threads to use.
-#' @param show_ideogram Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when `query_ucsc` is TRUE. 
-```
-
 ### profileplot()
 
 `profileplot()` is an `R` function to generate density based profile-plots from bigWig files.
@@ -109,28 +85,27 @@ profileplot(
 
 ![](https://user-images.githubusercontent.com/8164062/100755019-05f25c80-33ec-11eb-900e-a9595d443f0f.png)
 
-Available arguments
+### bwpcaplot()
+
+`bwpcaplot()` is a function to perform PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts. Plot data and region summaries returned to the user.
 
 ```r
-#' Generate profile plots with ease
-#' @param bigWigs bigWig files. Default NULL. Required.
-#' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
-#' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
-#' @param startFrom Default "center". Can be "center", "start" or "end"
-#' @param up extend upstream by this many bps from `startFrom`. Default 2500
-#' @param down extend downstream by this many bps from `startFrom`. Default 2500
-#' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'
-#' @param nthreads Default 4
-#' @param custom_names Default NULL and Parses from the file names.
-#' @param color Manual colors for each bigWig. Default NULL. 
-#' @param condition Default. Condition associated with each bigWig. Lines will colord accordingly.
-#' @param condition_colors Manual colors for each level in condition. Default NULL. 
-#' @param collapse_replicates Default FALSE. If TRUE and when `condition` is given, collapse signals samples belonging to same condition
-#' @param plot_se Default FALSE. If TRUE plots standard error shading
-#' @param line_size Default 1
-#' @param legend_fs Legend font size. Default 1
-#' @param axis_fs Axis font size. Default 1
+#PCA using UCSC protein coding reference transcripts (TSS+/- 2500 bp)
+bwpcaplot(
+  bigWigs = bigWigs,
+  ucsc_assembly = "hg38",
+  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+)
+
+#PCA using genomic regions of interest (BED file)
+bwpcaplot(
+  bigWigs = bigWigs,
+  bed = "CD34.narrowPeak",
+  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+)
 ```
+
+![](https://user-images.githubusercontent.com/8164062/101655218-a62a3000-3a41-11eb-8d20-38d046d6f042.png)
 
 ### Dependencies
 

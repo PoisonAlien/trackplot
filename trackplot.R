@@ -1,14 +1,15 @@
-# This R script contains two functions namely trackplot() and profileplot() for bigWig visualization
+# This R script contains three functions namely trackplot(), profileplot(), and bwpcaplot() for bigWig visualization
 #
 # trackplot() is a fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) from bigWig files.
 # profileplot() is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files.
+# bwpcaplot() is a function to perform PCA analysis based on genomic regions of interest or around TSS sites.
 #
 # Source code: https://github.com/PoisonAlien/trackplot
 #
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
-# Version: 1.1.11
+# Version: 1.2.0
 #
 # Changelog:
 # Version: 1.0.0 [2020-11-27]
@@ -19,6 +20,8 @@
 #   * trackplot() now plots ideogram of target chromosome
 # Version: 1.1.11 [2020-12-07]
 #   * Bug fixes in profileplot(): Typo for .check_dt() and startFrom estimation
+# Version: 1.2.0 [2020-12-09]
+#   * Added bwpcaplot()
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -143,35 +146,6 @@ trackplot = function(bigWigs = NULL,
     boxcolalpha = mark_regions_col_alpha,
     show_ideogram = show_ideogram
   )
-}
-
-
-.check_bwtool = function(warn = TRUE){
-  check = as.character(Sys.which(names = 'bwtool'))[1]
-  if(check != ""){
-    if(warn){
-      message("Checking for bwtool installation")
-      message(paste0("    All good! Found bwtool at: ", check))
-    }else{
-      return(invisible(0))
-    }
-  }else{
-    stop("Could not locate bwtool. Download it from here: https://github.com/CRG-Barcelona/bwtool/releases")
-  }
-}
-
-.check_mysql = function(warn = TRUE){
-  check = as.character(Sys.which(names = 'mysql'))[1]
-  if(check != ""){
-    if(warn){
-      message("Checking for mysql installation")
-      message(paste0("    All good! Found mysql at: ", check))
-    }else{
-      return(invisible(0))
-    }
-  }else{
-    stop("Could not locate mysql.\nInstall:\n apt install mysql-server [Debian]\n yum install mysql-server [centOS]\n brew install mysql [macOS]\n conda install -c anaconda mysql [conda]")
-  }
 }
 
 .gen_windows = function(chr = NA, start, end, window_size = 50, op_dir = getwd()){
@@ -686,18 +660,6 @@ trackplot = function(bigWigs = NULL,
   exon_tbls
 }
 
-.check_dt = function(){
-  if(!requireNamespace("data.table", quietly = TRUE)){
-    message("Could not find data.table library. Attempting to install..")
-    install.packages("data.table")
-  }
-}
-
-.check_windows = function(){
-  if(Sys.info()["sysname"] == "Windows"){
-    stop("Windows is not supported :(")
-  }
-}
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # profileplot is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files
@@ -750,8 +712,10 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   op_dir = tempdir() #For now
   
   if(is.null(color)){
-    color = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", 
-              "#A6761D", "#666666")
+    color = c("#A6CEE3FF", "#1F78B4FF", "#B2DF8AFF", "#33A02CFF", "#FB9A99FF", 
+              "#E31A1CFF", "#FDBF6FFF", "#FF7F00FF", "#CAB2D6FF", "#6A3D9AFF", 
+              "#FFFF99FF", "#9E0142FF", "#D53E4FFF", "#F46D43FF", "#000000FF", 
+              "#EE82EEFF", "#4169E1FF", "#7B7060FF", "#535C68FF")
     color = color[1:length(bigWigs)]
   }
   
@@ -763,7 +727,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
         warning("Multiple assemblies provided. Using first one..")
         ucsc_assembly = ucsc_assembly[1]
       }
-      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir)
+      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir, pc_genes = FALSE)
     }
   }else{
     startFrom = match.arg(arg = startFrom, choices = c("start", "end", "center"))
@@ -798,8 +762,10 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   if(!is.null(condition)){
     group_df = data.table::data.table(sample = names(sig_summary), condition = condition)
     if(is.null(condition_colors)){
-      condition_colors = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", 
-                           "#A6761D", "#666666")[1:nrow(group_df[,.N,condition])]
+      condition_colors = c("#A6CEE3FF", "#1F78B4FF", "#B2DF8AFF", "#33A02CFF", "#FB9A99FF", 
+                           "#E31A1CFF", "#FDBF6FFF", "#FF7F00FF", "#CAB2D6FF", "#6A3D9AFF", 
+                           "#FFFF99FF", "#9E0142FF", "#D53E4FFF", "#F46D43FF", "#000000FF", 
+                           "#EE82EEFF", "#4169E1FF", "#7B7060FF", "#535C68FF")[1:nrow(group_df[,.N,condition])]
     }
     names(condition_colors) = group_df[,.N,condition][,condition]
     color = condition_colors[group_df$condition]
@@ -842,7 +808,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   
 }
 
-.make_genome_bed = function(refBuild = "hg19", tss = "start", up = 2500, down = 2500, op_dir = tempdir(), pc_genes = TRUE){
+.make_genome_bed = function(refBuild = "hg19", tss = "start", up = 2500, down = 2500, op_dir = tempdir(), pc_genes = FALSE){
   if(!dir.exists(paths = op_dir)){
     dir.create(path = op_dir, showWarnings = FALSE, recursive = TRUE)
   }
@@ -859,6 +825,10 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
   
   main_contigs = paste0("chr", c(1:22, "X", "Y"))
   ucsc = ucsc[chr %in% main_contigs]
+  
+  if(pc_genes){
+    ucsc = ucsc[tx_id %like% "^NM"]
+  }
   
   message("Fetched ", nrow(ucsc), " transcripts from ", nrow(ucsc[,.N,.(chr)]), " contigs")
   
@@ -1014,6 +984,234 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 }
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# bwpcaplot function to perform PCA analysis based on genomic regions of interest or around TSS sites.
+
+#' Perform PCA analysis
+#' @param bigWigs bigWig files. Default NULL. Required.
+#' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
+#' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
+#' @param top Top most variable peaks to consider for PCA. Default 1000
+#' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. Default 'hg19'
+#' @param nthreads Default 4
+#' @param custom_names Default NULL and Parses from the file names.
+#' @param color Manual colors for each bigWig. Default NULL. 
+#' @param condition Default. Condition associated with each bigWig. Lines will colord accordingly.
+#' @param condition_colors Manual colors for each level in condition. Default NULL. 
+#' @param show_cree If TRUE draws a cree plot. Default TRUE
+#' 
+bwpcaplot = function(bigWigs = NULL, bed = NULL, binSize = 50, top = 1000,
+                       nthreads = 4, ucsc_assembly = "hg19", custom_names = NULL, color = NULL, condition = NULL, condition_colors = NULL, show_cree = TRUE){
+  
+  .check_windows()
+  .check_bwtool()
+  .check_dt()
+  
+  if(is.null(bigWigs)){
+    stop("Missing bigWig files")
+  }
+  
+  message("Checking for files..")
+  for(i in 1:length(bigWigs)){
+    if(!file.exists(as.character(bigWigs)[i])){
+      stop(paste0(as.character(bigWigs)[i], " does not exist!"))
+    }
+  }
+  
+  if(!is.null(custom_names)){
+    if(length(custom_names) != length(bigWigs)){
+      stop("Please provide names for all bigWigs")
+    }
+  }else{
+    custom_names = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "", x = basename(bigWigs))
+  }
+  
+  op_dir = tempdir() #For now
+  if(!dir.exists(paths = op_dir)){
+    dir.create(path = op_dir, showWarnings = FALSE, recursive = TRUE)
+  }
+  
+  if(is.null(color)){
+    color = c("#A6CEE3FF", "#1F78B4FF", "#B2DF8AFF", "#33A02CFF", "#FB9A99FF", 
+              "#E31A1CFF", "#FDBF6FFF", "#FF7F00FF", "#CAB2D6FF", "#6A3D9AFF", 
+              "#FFFF99FF", "#9E0142FF", "#D53E4FFF", "#F46D43FF", "#000000FF", 
+              "#EE82EEFF", "#4169E1FF", "#7B7060FF", "#535C68FF")
+    color = color[1:length(bigWigs)]
+  }
+  
+  if(!is.null(ucsc_assembly)){
+    #If assembly is requested, fetch protein coding transcripts (+/- 2500bp.
+    temp_op_bed = .make_genome_bed(refBuild = ucsc_assembly, tss = "start", pc_genes = TRUE)
+  }else{
+    temp_op_bed = tempfile(pattern = "pcaplot", tmpdir = op_dir, fileext = ".bed")
+    if(is.data.frame(bed)){
+      bed = data.table::as.data.table(x = bed)
+      #data.table::setDT(x = bed)
+      colnames(bed)[1:3] = c("chr", "start", "end")
+      bed[, chr := as.character(chr)]
+      bed[, start := as.numeric(as.character(start))]
+      bed[, end := as.numeric(as.character(end))]
+    }else if(file.exists(bed)){
+      bed = data.table::fread(file = bed, select = list(character = 1, numeric = c(2, 3)), col.names = c("chr", "start", "end"))
+    }
+    data.table::fwrite(x = bed[,.(chr, start, end)], file = temp_op_bed, sep = "\t", col.names = FALSE)
+  }
+  
+  message("Extracting BED summaries..")
+  summaries = parallel::mclapply(bigWigs, FUN = function(bw){
+    bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "", x = basename(bw))
+    message(paste0("    Processing ", bn, " .."))
+    cmd = paste("bwtool summary -with-sum -keep-bed -header", temp_op_bed, bw, paste0(op_dir, bn, ".summary"))
+    system(command = cmd, intern = TRUE)
+    paste0(op_dir, bn, ".summary")
+  }, mc.cores = nthreads)
+  
+  summary_list = lapply(summaries, function(x){
+    x = data.table::fread(x)
+    colnames(x)[1] = 'chromosome'
+    x = x[,.(chromosome, start, end, size, sum)]
+    x[,id := paste0(chromosome, ":", start, "-", end)]
+    x
+  })
+  
+  names(summary_list) = custom_names
+  
+  sum_tbl = data.table::rbindlist(l = summary_list, idcol = "sample", use.names = TRUE, fill = TRUE)
+  sum_tbl = data.table::dcast(data = sum_tbl, formula =  id ~ sample, value.var = "sum", fun.aggregate = max)
+  data.table::setDF(x = sum_tbl, rownames = sum_tbl$id)
+  sum_tbl$id = NULL
+  
+  if(!is.null(condition)){
+    group_df = data.table::data.table(sample = names(summary_list), condition = condition)
+    if(is.null(condition_colors)){
+      condition_colors = c("#A6CEE3FF", "#1F78B4FF", "#B2DF8AFF", "#33A02CFF", "#FB9A99FF", 
+                           "#E31A1CFF", "#FDBF6FFF", "#FF7F00FF", "#CAB2D6FF", "#6A3D9AFF", 
+                           "#FFFF99FF", "#9E0142FF", "#D53E4FFF", "#F46D43FF", "#000000FF", 
+                           "#EE82EEFF", "#4169E1FF", "#7B7060FF", "#535C68FF")[1:nrow(group_df[,.N,condition])]
+    }
+    names(condition_colors) = group_df[,.N,condition][,condition]
+    group_df$color = condition_colors[group_df$condition]
+  }else{
+    group_df = data.table::data.table(sample = names(summary_list), color = color)
+  }
+  
+  sum_tbl = sum_tbl[complete.cases(sum_tbl),, drop = FALSE]
+  if(nrow(sum_tbl) < top){
+    pca = prcomp(t(.order_by_sds(mat = sum_tbl)))
+  }else{
+    pca = prcomp(t(.order_by_sds(mat = sum_tbl)[1:top,]))  
+  }
+  
+  pca_dat = as.data.frame(pca$x)
+  pca_var_explained = pca$sdev^2/sum(pca$sdev^2)
+  data.table::setDT(x = pca_dat, keep.rownames = "sample")
+  pca_dat = merge(pca_dat, group_df, by = 'sample')
+  attr(pca_dat, "percentVar") <- round(pca_var_explained, digits = 3)
+
+  if(show_cree){
+    lo = layout(mat = matrix(data = c(1, 2), ncol = 2))
+  }
+  
+  grid_cols = "gray90"
+  par(mar = c(3, 4, 1, 1))
+  plot(NA, axes = FALSE, xlab = NA, ylab = NA, cex = 1.2, xlim = range(pretty(pca_dat$PC1)), ylim = range(pretty(pca_dat$PC2)))
+  abline(h = pretty(pca_dat$PC2), v = pretty(pca_dat$PC1), col = grid_cols, lty = 2)
+  points(x = pca_dat$PC1, y = pca_dat$PC2, col = "black", bg = pca_dat$color, pch = 21, cex = 1.25)
+  axis(side = 1, at = pretty(pca_dat$PC1), cex.axis = 0.8)
+  axis(side = 2, at = pretty(pca_dat$PC2), las = 2, cex.axis = 0.8)
+  mtext(text = paste0("PC2 [", round(pca_var_explained[2], digits = 2), "]"), side = 2, line = 2.5, cex = 0.8)
+  mtext(text = paste0("PC1 [", round(pca_var_explained[1], digits = 2), "]"), side = 1, line = 2, cex = 0.8)
+  text(x = pca_dat$PC1, y = pca_dat$PC2, labels = pca_dat$sample, pos = 3, col = pca_dat$color, xpd = TRUE, cex = 0.8)
+  #title(main = NA, sub = paste0("N = ", top, " peaks"), adj = 0, outer = TRUE)
+
+  if(!is.null(condition)){
+    legend(x = "topright", legend = unique(pca_dat$condition), col = unique(pca_dat$color), bty = "n", pch = 19, cex = 0.8, xpd = TRUE, ncol = 2)
+  }
+  
+  if(show_cree){
+    par(mar = c(3, 4, 1, 4))
+    b = barplot(height = pca_var_explained, names.arg = NA, col = "#2c3e50", ylim = c(0, 1), las = 2, axes = FALSE)
+    points(x = b, y = cumsum(pca_var_explained), type = 'l', lty = 2, lwd = 1.2, xpd = TRUE, col = "#c0392b")
+    points(x = b, y = cumsum(pca_var_explained), type = 'p', pch = 19, xpd = TRUE, col = "#c0392b")
+    mtext(text = paste0("PC", 1:length(pca_var_explained)), side = 1, at = b, las = 2, line = 0.5, cex = 0.8)
+    axis(side = 2, at = seq(0, 1, 0.1), line = 0, las = 2, cex.axis = 0.8)
+    mtext(text = "var. explained", side = 2, line = 2.5)
+    axis(side = 4, at = seq(0, 1, 0.1), line = 0, las = 2, cex.axis = 0.8)
+    mtext(text = "cumulative var. explained", side = 4, line = 2.5)
+  }
+  
+  list(pca_data = pca_dat, bed_summary = sum_tbl)
+}
+
+.order_by_sds = function(mat, keep_sd = FALSE){
+  mat_sd = apply(as.matrix(mat), 1, sd, na.rm = TRUE) #order it based on SD
+  mat_sd = sort(mat_sd, decreasing = TRUE)
+  mat = mat[names(mat_sd),, drop = FALSE]
+  mat
+}
+
+.extract_summary = function(bw, binSize, bed, op_dir){
+  bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "",
+            x = basename(bw), ignore.case = TRUE)
+  message(paste0("    Processing ", bn, ".."))
+  
+  cmd = paste("bwtool summary -with-sum -keep-bed -header", bedSimple, bw, paste0(op_dir, bn, ".summary"))
+  paste0(op_dir, "/", bn, ".summary")
+}
+
+.loci2df = function(loci){
+  chr = as.character(unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 1)))
+  start = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, split = ":", keep = 2)), split = "-", keep = 1))
+  start = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(start))))
+  end = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, split = ":", keep = 2)), split = "-", keep = 2))
+  end = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(end))))
+  data.table::data.table(chr, start, end)
+}
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Global functions
+.check_bwtool = function(warn = TRUE){
+  check = as.character(Sys.which(names = 'bwtool'))[1]
+  if(check != ""){
+    if(warn){
+      message("Checking for bwtool installation")
+      message(paste0("    All good! Found bwtool at: ", check))
+    }else{
+      return(invisible(0))
+    }
+  }else{
+    stop("Could not locate bwtool. Download it from here: https://github.com/CRG-Barcelona/bwtool/releases")
+  }
+}
+
+.check_mysql = function(warn = TRUE){
+  check = as.character(Sys.which(names = 'mysql'))[1]
+  if(check != ""){
+    if(warn){
+      message("Checking for mysql installation")
+      message(paste0("    All good! Found mysql at: ", check))
+    }else{
+      return(invisible(0))
+    }
+  }else{
+    stop("Could not locate mysql.\nInstall:\n apt install mysql-server [Debian]\n yum install mysql-server [centOS]\n brew install mysql [macOS]\n conda install -c anaconda mysql [conda]")
+  }
+}
+
+.check_dt = function(){
+  if(!requireNamespace("data.table", quietly = TRUE)){
+    message("Could not find data.table library. Attempting to install..")
+    install.packages("data.table")
+  }
+  suppressPackageStartupMessages(expr = library("data.table", quietly = TRUE, warn.conflicts = FALSE, verbose = FALSE))
+}
+
+.check_windows = function(){
+  if(Sys.info()["sysname"] == "Windows"){
+    stop("Windows is not supported :(")
+  }
+}
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #Test
 # .run_test_trackplot = function(){
@@ -1040,7 +1238,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 #   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
 #   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
 #   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
-#   bed = "/Volumes/datadrive/bws/trackR/CD34_blacklist_filtered.narrowPeak"
+#   bed = "/Volumes/datadrive/bws/trackR/sample.narrowPeak"
 # 
 #   profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
 # }
