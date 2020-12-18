@@ -991,7 +991,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 #' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
 #' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
 #' @param top Top most variable peaks to consider for PCA. Default 1000
-#' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. Default 'hg19'
+#' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'
 #' @param nthreads Default 4
 #' @param custom_names Default NULL and Parses from the file names.
 #' @param color Manual colors for each bigWig. Default NULL. 
@@ -1000,7 +1000,7 @@ profileplot = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom = "ce
 #' @param show_cree If TRUE draws a cree plot. Default TRUE
 #' 
 bwpcaplot = function(bigWigs = NULL, bed = NULL, binSize = 50, top = 1000,
-                       nthreads = 4, ucsc_assembly = "hg19", custom_names = NULL, color = NULL, condition = NULL, condition_colors = NULL, show_cree = TRUE){
+                       nthreads = 4, ucsc_assembly = NULL, custom_names = NULL, color = NULL, condition = NULL, condition_colors = NULL, show_cree = TRUE){
   
   .check_windows()
   .check_bwtool()
