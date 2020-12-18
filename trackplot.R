@@ -483,7 +483,7 @@ trackplot = function(bigWigs = NULL,
   })
   names(gposCols) <- paste0("gpos", 1:100)
   colorSheme <- c(gposCols, colorSheme)
-  cyto$color = color_scheme[cyto[,stain]]
+  cyto$color = colorSheme[cyto[,stain]]
   cyto
   
   cyto
