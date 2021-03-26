@@ -41,18 +41,18 @@ bigWigs = c("CD34.bw", "EC.bw", "LC.bw", "CD4p.bw", "CD8p.bw")
 #Step-1. Extract the siganl for your loci of interst
 track_data = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
 
-#Step-2. Plot 
-trackplot(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
+#Step-2. 
+#Basic Plot 
+track_plot(summary_list = track_data)
 
-#2. With gene models (by default autoamtically queries UCSC genome browser for hg19 transcripts)
+#With gene models (by default autoamtically queries UCSC genome browser for hg19 transcripts)
 track_plot(summary_list = track_data, draw_gene_track = TRUE, build = "hg38")
 
-#3. With GTF file as source for gene models
+#With GTF file as source for gene models
 track_plot(summary_list = track_data, draw_gene_track = TRUE, gene_model = "hg38_refseq.gtf.gz", isGTF = TRUE)
 
-#4. Heighlight regions of interest
+#Heighlight regions of interest
 
-## Example regions to heighlight
 markregions = data.frame(
     chr = c("chr3", "chr3"),
     start = c(187743255, 187735888),
@@ -83,12 +83,22 @@ track_plot(
 #Example profile plot for a bed file with ~33,250 peaks, centered and extended 2500 bps
 profile_data = profile_extract(
   bigWigs = bigWigs,
-  bed = "sample.bed",
+  bed = "CD34.bed",
   startFrom = "center",
   up = 2500,
   down = 2500
 )
 
+profile_plot(profile_data)
+
+#profile plot for refseq protein-coding genes (TSS +/2500)
+profile_data = profile_extract(
+  bigWigs = bigWigs,
+  ucsc_assembly = "hg38",
+  startFrom = "tss",
+  up = 2500,
+  down = 2500
+)
 profile_plot(profile_data)
 ```
 
