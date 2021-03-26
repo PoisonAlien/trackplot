@@ -1,13 +1,22 @@
 ## Introduction
 
 `trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files. 
-It has three main functions:
+It has three main utilities:
 
-* `trackplot()` - for IGV style track plots
-* `profileplot()` - for density based profile plots
-* `bwpcaplot()` - PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts.
+* `track_extract()` -> `track_plot()` - for IGV style track plots
+* `profile_extract()` -> `profile_plot()` - for density based profile plots
+* `extract_signal()` -> `pca_plot()` - PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts.
 
 `trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for dependencies.
+
+```r
+source("https://github.com/PoisonAlien/trackplot/blob/master/trackplot.R?raw=true")
+
+# OR
+
+download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
+source('trackplot.R') 
+```
 
 Features:
 
@@ -21,29 +30,29 @@ Features:
 
 ### Usage
 
-### trackplot()
+### trackplots
 
-`trackplot()` is an `R` function to generate IGV style track plots (aka locus plots) from bigWig files.
+`track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files.
  
 ```r
-download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
-source('trackplot.R') 
-
 #Path to bigWig files
 bigWigs = c("CD34.bw", "EC.bw", "LC.bw", "CD4p.bw", "CD8p.bw")
 
-#1. Basic usage
+#Step-1. Extract the siganl for your loci of interst
+track_data = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
+
+#Step-2. Plot 
 trackplot(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
 
 #2. With gene models (by default autoamtically queries UCSC genome browser for hg19 transcripts)
-trackplot(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003", draw_gene_track = TRUE, build = "hg38")
+track_plot(summary_list = track_data, draw_gene_track = TRUE, build = "hg38")
 
 #3. With GTF file as source for gene models
-trackplot(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003", draw_gene_track = TRUE, gene_model = "hg38_refseq.gtf.gz", isGTF = TRUE)
+track_plot(summary_list = track_data, draw_gene_track = TRUE, gene_model = "hg38_refseq.gtf.gz", isGTF = TRUE)
 
 #4. Heighlight regions of interest
 
-## Example regions to heighlight (optional)
+## Example regions to heighlight
 markregions = data.frame(
     chr = c("chr3", "chr3"),
     start = c(187743255, 187735888),
@@ -51,13 +60,12 @@ markregions = data.frame(
     name = c("Promoter-1", "Promoter-2")
   )
   
-trackplot(
-  bigWigs = bigWigs,
-  loci = "chr3:187,715,903-187,752,003",
+track_plot(
+  summary_list = track_data,
   draw_gene_track = TRUE,
+  show_ideogram = TRUE,
   build = "hg38",
-  mark_regions = markregions,
-  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+  regions = markregions
 )
 ```
 
@@ -65,7 +73,7 @@ trackplot(
 
 ### profileplot()
 
-`profileplot()` is an `R` function to generate density based profile-plots from bigWig files.
+`profile_extract()` and `profile_plot()` are functions to generate density based profile-plots from bigWig files.
 
   * Below example for summarizing approx. 33,250 peaks for 5 bigWig files takes around 90 seconds on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB). This includes generating signal matrix, summarizing, and plotting
   * Optionally, it can even query UCSC genome browser for refseq transcripts of desired assembly and summarize around TSS regions
@@ -73,14 +81,15 @@ trackplot(
 
 ```r
 #Example profile plot for a bed file with ~33,250 peaks, centered and extended 2500 bps
-profileplot(
+profile_data = profile_extract(
   bigWigs = bigWigs,
-  bed = "CD34.narrowPeak",
+  bed = "sample.bed",
   startFrom = "center",
   up = 2500,
-  down = 2500,
-  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
+  down = 2500
 )
+
+profile_plot(profile_data)
 ```
 
 ![](https://user-images.githubusercontent.com/8164062/100755019-05f25c80-33ec-11eb-900e-a9595d443f0f.png)
@@ -91,25 +100,26 @@ profileplot(
 
 ```r
 #PCA using UCSC protein coding reference transcripts (TSS+/- 2500 bp)
-bwpcaplot(
+refseq_summary = extract_summary(
   bigWigs = bigWigs,
-  ucsc_assembly = "hg38",
+  ucsc_assembly = "hg38"
+)
+
+pca_plot(summary_list = refseq_summary)
+
+#PCA using genomic regions of interest (BED file)
+bed_summary = extract_summary(
+  bigWigs = bigWigs,
+  bed = "sample.bed",
   custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
 )
 
-#PCA using genomic regions of interest (BED file)
-bwpcaplot(
-  bigWigs = bigWigs,
-  bed = "CD34.narrowPeak",
-  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
-)
+pca_plot(summary_list = bed_summary)
 ```
 
 ![](https://user-images.githubusercontent.com/8164062/101655218-a62a3000-3a41-11eb-8d20-38d046d6f042.png)
 
 ### Dependencies
-
-`trackplot` has only two dependencies. 
 
 * [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
 * [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). If you have trouble compiling the tool, follow [these](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8) instructions. Alternatively, you can download the pre-built binary for [macOS](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1) or [centOS](https://www.dropbox.com/s/77ek89jqfhcmouu/bwtool_centOS_x86_64.tar.gz?dl=1)
