@@ -24,6 +24,8 @@
 #   * Added bwpcaplot()
 # Version: 1.3.0 [2021-03-26]
 #   * modularize the code base to avoid repetitve data extraction and better plotting
+# Version: 1.3.01 [2021-04-26]
+#   * Fix gtf bug. Issue: #3
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -188,7 +190,7 @@ track_plot = function(summary_list = NULL,
         lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_track_height))  
       }
     }else{
-      if(gtf){
+      if(isGTF){
         etbl = .parse_gtf(gtf = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
       }else{
         etbl = .extract_geneModel(ucsc_tbl = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
