@@ -10,12 +10,16 @@ It has three main utilities:
 `trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for dependencies.
 
 ```r
-source("https://github.com/PoisonAlien/trackplot/blob/master/trackplot.R?raw=true")
+source("https://github.com/PoisonAlien/trackplot/blob/master/R/trackplot.R?raw=true")
 
 # OR
 
-download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/trackplot.R", destfile = "trackplot.R")
+download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/R/trackplot.R", destfile = "trackplot.R")
 source('trackplot.R') 
+
+
+# OR If you prefer to have it as package
+remotes::install_github(repo = "poisonalien/trackplot")
 ```
 
 Features:
@@ -27,12 +31,13 @@ Features:
     - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
     - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
   * Customization: Each plot can customized for color, scale, width, etc.
+  * Tracks can be summarized per condition (by mean, median, max, min)
 
 ### Usage
 
 ### trackplots
 
-`track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files.
+`track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files. Additionally, `track_summarize` can summarize tracks by condition.
  
 ```r
 #Path to bigWig files
@@ -40,6 +45,9 @@ bigWigs = c("CD34.bw", "EC.bw", "LC.bw", "CD4p.bw", "CD8p.bw")
 
 #Step-1. Extract the siganl for your loci of interst
 track_data = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
+
+#Step-1a (optional). Summarize trcks by condition
+track_data = track_summarize(summary_list = track_data, condition = c("A", "B", "B", "C", "D"), stat = "mean")
 
 #Step-2. 
 #Basic Plot 

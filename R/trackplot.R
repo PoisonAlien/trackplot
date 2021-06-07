@@ -9,23 +9,26 @@
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
-# Version: 1.3.0
+# Version: 1.3.05
 #
 # Changelog:
-# Version: 1.0.0 [2020-11-27]
-#   * Initial release
-# Version: 1.1.0 [2020-12-01]
-#   * Added profileplot()
-# Version: 1.1.1 [2020-12-04]
-#   * trackplot() now plots ideogram of target chromosome
-# Version: 1.1.11 [2020-12-07]
-#   * Bug fixes in profileplot(): Typo for .check_dt() and startFrom estimation
-# Version: 1.2.0 [2020-12-09]
-#   * Added bwpcaplot()
-# Version: 1.3.0 [2021-03-26]
-#   * modularize the code base to avoid repetitve data extraction and better plotting
+# Version: 1.3.05 [2021-06-07]
+#   * Summarize tracks. Issue: #4
+#   * Allow thescript to install as a package.
 # Version: 1.3.01 [2021-04-26]
 #   * Fix gtf bug. Issue: #3
+# Version: 1.3.0 [2021-03-26]
+#   * modularize the code base to avoid repetitve data extraction and better plotting
+# Version: 1.2.0 [2020-12-09]
+#   * Added bwpcaplot()
+# Version: 1.1.11 [2020-12-07]
+#   * Bug fixes in profileplot(): Typo for .check_dt() and startFrom estimation
+# Version: 1.1.1 [2020-12-04]
+#   * trackplot() now plots ideogram of target chromosome
+# Version: 1.1.0 [2020-12-01]
+#   * Added profileplot()
+# Version: 1.0.0 [2020-11-27]
+#   * Initial release
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -78,8 +81,54 @@ track_extract = function(bigWigs = NULL, loci = NULL, binsize = 50, custom_names
   
   windows = .gen_windows(chr = chr, start = start, end = end, window_size = binsize, op_dir = op_dir)
   track_summary = .get_summaries(bedSimple = windows, bigWigs = bigWigs, op_dir = op_dir, nthreads = nthreads)
+  if(!is.null(custom_names)){
+    names(track_summary) = custom_names  
+  }
   track_summary$loci = c(chr, start, end)
   track_summary
+}
+
+#' Summarize tracks per condition
+#' @param summary_list Output from track_extract. Required.
+#' @param condition Default NULL. Provide condition for each bigWig file 
+#' @param stat can be `mean, median`, `max`, `min`. NAs are excluded. 
+#' @export
+track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean"){
+  
+  if(is.null(summary_list)){
+    stop("Missing input! Expecting output from track_extract()")
+  }
+  
+  if(is.null(condition)){
+    stop("Missing condition! Provide condition for each bigWig file.")
+  }
+  
+  stat = match.arg(arg = stat, choices = c("mean", "median", "max", "min"))
+  
+  loci = summary_list$loci
+  summary_list$loci = NULL
+  if(length(condition) != length(summary_list)){
+    stop("Incorrect conditions! Provide condition for each bigWig file.")
+  }
+  
+  names(summary_list) = condition
+  
+  summary_list = data.table::rbindlist(l = summary_list, use.names = TRUE, fill = TRUE, idcol = "sample_name")
+  
+  if(stat == "mean"){
+    summary_list = summary_list[,mean(max, na.rm = TRUE), .(sample_name, chromosome, start, end)]  
+  }else if (stat == "median"){
+    summary_list = summary_list[,median(max, na.rm = TRUE), .(sample_name, chromosome, start, end)]
+  }else if (stat == "max"){
+    summary_list = summary_list[,max(max, na.rm = TRUE), .(sample_name, chromosome, start, end)]
+  }else{
+    summary_list = summary_list[,min(max, na.rm = TRUE), .(sample_name, chromosome, start, end)]
+  }
+  
+  colnames(summary_list)[ncol(summary_list)] = "max" #this column name means nothing, just using it for the consistency
+  summary_list = split(summary_list, summary_list$sample_name)
+  summary_list$loci = loci
+  summary_list
 }
 
 #' Generate IGV style locus tracks with ease
@@ -1246,9 +1295,9 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
 
 #Test
 # .run_test_trackplot = function(){
-#   bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
-#bigWigs = list.files(path = "/bigdisk/Aurore/Epigenomic_landscape_Adult_T-ALL/data/extdata/BLUEPRINT_final_data/H3K27ac/bigWigs/", pattern = "*\\.bw", full.names = TRUE)
-#   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
+#   #bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
+#   bigWigs = list.files(path = "/bigdisk/Aurore/Epigenomic_landscape_Adult_T-ALL/data/extdata/BLUEPRINT_final_data/H3K27ac/bigWigs/", pattern = "*\\.bw", full.names = TRUE)
+#   bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
 #   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
 # markregions = data.frame(
 #   chr = c("chr3", "chr3"),
@@ -1256,6 +1305,9 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
 #   end = c(187747473, 187736777),
 #   name = c("Promoter-1", "Promoter-2")
 # )
+# 
+# tracks = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003", binsize = 50, custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+"), nthreads = 6)
+# 
 # trackplot(
 #   bigWigs = bigWigs,
 #   loci = "chr3:187,715,903-187,752,003",
