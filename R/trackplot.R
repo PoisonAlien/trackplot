@@ -13,12 +13,12 @@
 #
 # Changelog:
 # Version: 1.3.05 [2021-06-07]
-#   * Summarize tracks. Issue: #4
-#   * Allow thescript to install as a package.
+#   * Summarize and groupScaleByCondition tracks by condition. Issue: #4
+#   * Allow the script to install as a package.
 # Version: 1.3.01 [2021-04-26]
 #   * Fix gtf bug. Issue: #3
 # Version: 1.3.0 [2021-03-26]
-#   * modularize the code base to avoid repetitve data extraction and better plotting
+#   * modularize the code base to avoid repetitive data extraction and better plotting
 # Version: 1.2.0 [2020-12-09]
 #   * Added bwpcaplot()
 # Version: 1.1.11 [2020-12-07]
@@ -143,6 +143,7 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param gene_model File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server
 #' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
 #' @param groupAutoScale Default TRUE
+#' @param groupScaleByCondition Scale tracks by condition
 #' @param gene_fsize Font size. Default 1
 #' @param gene_track_height Default 2 
 #' @param scale_track_height Default 1
@@ -161,6 +162,7 @@ track_plot = function(summary_list = NULL,
                       build = "hg19",
                       col = "gray70",
                       groupAutoScale = TRUE,
+                      groupScaleByCondition = FALSE,
                       txname = NULL,
                       genename = NULL,
                       gene_track_height = 2,
@@ -213,7 +215,15 @@ track_plot = function(summary_list = NULL,
     names(summary_list) = track_names
   }
   
-  if(groupAutoScale){
+  if(groupScaleByCondition){
+    plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
+    plot_height = data.table::data.table(plot_height, col, names(summary_list))
+    plot_height$og_ord = 1:nrow(plot_height)
+    plot_height = plot_height[order(col)]
+    plot_height_max = plot_height[,.(.N, max(plot_height)), .(col)]
+    plot_height$max = rep(plot_height_max$V2, plot_height_max$N)
+    plot_height = plot_height[order(og_ord)][,max]
+  }else if(groupAutoScale){
     plot_height = max(unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE))), na.rm = TRUE)
     plot_height = rep(plot_height, length(summary_list))
   }else{
