@@ -233,7 +233,7 @@ track_plot = function(summary_list = NULL,
     plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
   }
   
-  if(y_max){
+  if(!is.null(y_max)){
     #If custom ylims are provided
     plot_height = y_max
   }else{
