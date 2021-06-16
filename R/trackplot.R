@@ -15,6 +15,7 @@
 # Version: 1.3.05 [2021-06-07]
 #   * Summarize and groupScaleByCondition tracks by condition. Issue: #4
 #   * Allow the script to install as a package.
+#   * Added y_max argument for custom y-axis limits in track_plot. 
 # Version: 1.3.01 [2021-04-26]
 #   * Fix gtf bug. Issue: #3
 # Version: 1.3.0 [2021-03-26]
@@ -144,6 +145,7 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
 #' @param groupAutoScale Default TRUE
 #' @param groupScaleByCondition Scale tracks by condition
+#' @param y_max custom y axis limits for each track. Recycled if required.
 #' @param gene_fsize Font size. Default 1
 #' @param gene_track_height Default 2 
 #' @param scale_track_height Default 1
@@ -163,6 +165,7 @@ track_plot = function(summary_list = NULL,
                       col = "gray70",
                       groupAutoScale = TRUE,
                       groupScaleByCondition = FALSE,
+                      y_max = NULL,
                       txname = NULL,
                       genename = NULL,
                       gene_track_height = 2,
@@ -230,7 +233,13 @@ track_plot = function(summary_list = NULL,
     plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
   }
   
-  plot_height = round(plot_height, digits = 2)
+  if(y_max){
+    #If custom ylims are provided
+    plot_height = y_max
+  }else{
+    plot_height = round(plot_height, digits = 2)  
+  }
+  
   
   ntracks = length(summary_list)
   if(draw_gene_track){
@@ -456,6 +465,7 @@ profile_extract = function(bigWigs = NULL, bed = NULL, binSize = 50, startFrom =
 }
 
 
+#' Draw a profile plot
 #' @param sig_list Output generated from profile_extract
 #' @param color Manual colors for each bigWig. Default NULL. 
 #' @param condition Default. Condition associated with each bigWig. Lines will colord accordingly.
@@ -548,7 +558,7 @@ profile_plot = function(sig_list = NULL, color = NULL, condition = NULL, conditi
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # bwpcaplot function to perform PCA analysis based on genomic regions of interest or around TSS sites.
 
-#' Perform PCA analysis
+#' Extract area under the curve for every peak from from given bigWig files.
 #' @param bigWigs bigWig files. Default NULL. Required.
 #' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
 #' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
@@ -632,7 +642,7 @@ extract_summary = function(bigWigs = NULL, bed = NULL, binSize = 50, top = 1000,
   
 }
 
-
+#' Draw a PCA plot
 #' @param summary_list output from extract_summary
 #' @param top Top most variable peaks to consider for PCA. Default 1000
 #' @param color Manual colors for each bigWig. Default NULL. 

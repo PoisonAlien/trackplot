@@ -8,3 +8,5 @@ Authors@R:
            email = "anandmt3@gmail.com")
 Description: trackplot is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files.
 License: MIT
+RoxygenNote: 7.1.1
+Depends: data.table
