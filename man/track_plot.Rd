@@ -14,6 +14,7 @@ track_plot(
   groupAutoScale = TRUE,
   groupScaleByCondition = FALSE,
   y_max = NULL,
+  y_min = NULL,
   txname = NULL,
   genename = NULL,
   gene_track_height = 2,
@@ -24,7 +25,7 @@ track_plot(
   track_names_pos = 0,
   regions = NULL,
   region_width = 1,
-  collapse_txs = FALSE,
+  collapse_txs = TRUE,
   boxcol = "#192A561A",
   boxcolalpha = 0.2,
   gene_model = NULL,
@@ -48,7 +49,9 @@ track_plot(
 
 \item{groupScaleByCondition}{Scale tracks by condition}
 
-\item{y_max}{custom y axis limits for each track. Recycled if required.}
+\item{y_max}{custom y axis upper limits for each track. Recycled if required.}
+
+\item{y_min}{custom y axis lower limits for each track. Recycled if required.}
 
 \item{txname}{transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region}
 

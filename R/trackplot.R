@@ -9,9 +9,13 @@
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
-# Version: 1.3.05
+# Version: 1.3.10
 #
 # Changelog:
+# Version: 1.3.10 [2021-10-06]
+#   * Support for negative values (Issue: https://github.com/PoisonAlien/trackplot/issues/6 )
+#   * Added y_min argument to track_plot. 
+#   * Change the default value for collapse_tx to TRUE
 # Version: 1.3.05 [2021-06-07]
 #   * Summarize and groupScaleByCondition tracks by condition. Issue: #4
 #   * Allow the script to install as a package.
@@ -145,7 +149,8 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param isGTF Default FALSE. Set to TRUE if the `gene_model` is a gtf file.
 #' @param groupAutoScale Default TRUE
 #' @param groupScaleByCondition Scale tracks by condition
-#' @param y_max custom y axis limits for each track. Recycled if required.
+#' @param y_max custom y axis upper limits for each track. Recycled if required.
+#' @param y_min custom y axis lower limits for each track. Recycled if required.
 #' @param gene_fsize Font size. Default 1
 #' @param gene_track_height Default 2 
 #' @param scale_track_height Default 1
@@ -166,6 +171,7 @@ track_plot = function(summary_list = NULL,
                       groupAutoScale = TRUE,
                       groupScaleByCondition = FALSE,
                       y_max = NULL,
+                      y_min = NULL,
                       txname = NULL,
                       genename = NULL,
                       gene_track_height = 2,
@@ -176,7 +182,7 @@ track_plot = function(summary_list = NULL,
                       track_names_pos = 0,
                       regions = NULL,
                       region_width = 1,
-                      collapse_txs = FALSE,
+                      collapse_txs = TRUE,
                       boxcol = "#192A561A",
                       boxcolalpha = 0.2,
                       gene_model = NULL,
@@ -220,26 +226,47 @@ track_plot = function(summary_list = NULL,
   
   if(groupScaleByCondition){
     plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
-    plot_height = data.table::data.table(plot_height, col, names(summary_list))
+    plot_height_min = unlist(lapply(summary_list, function(x) min(x$max, na.rm = TRUE)))
+    plot_height = data.table::data.table(plot_height, plot_height_min, col, names(summary_list))
     plot_height$og_ord = 1:nrow(plot_height)
     plot_height = plot_height[order(col)]
     plot_height_max = plot_height[,.(.N, max(plot_height)), .(col)]
+    plot_height_min = plot_height[,.(.N, max(plot_height_min)), .(col)]
     plot_height$max = rep(plot_height_max$V2, plot_height_max$N)
+    plot_height$min = rep(plot_height_min$V2, plot_height_min$N)
+    plot_height_min = plot_height[order(og_ord)][,min]
     plot_height = plot_height[order(og_ord)][,max]
   }else if(groupAutoScale){
     plot_height = max(unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE))), na.rm = TRUE)
+    plot_height_min = min(unlist(lapply(summary_list, function(x) min(x$max, na.rm = TRUE))), na.rm = TRUE)
     plot_height = rep(plot_height, length(summary_list))
+    plot_height_min = rep(plot_height_min, length(summary_list))
   }else{
     plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
+    plot_height_min = unlist(lapply(summary_list, function(x) min(x$max, na.rm = TRUE)))
   }
   
   if(!is.null(y_max)){
     #If custom ylims are provided
+    if(length(y_max) != length(summary_list)){
+      y_max = rep(y_max, length(summary_list))
+    }
     plot_height = y_max
+    
   }else{
     plot_height = round(plot_height, digits = 2)  
   }
   
+  if(!is.null(y_min)){
+    #If custom ylims are provided
+    if(length(y_min) != length(summary_list)){
+      y_min = rep(y_min, length(summary_list))
+    }
+    plot_height_min = y_min
+    
+  }else{
+    plot_height_min = round(plot_height_min, digits = 2)  
+  }
   
   ntracks = length(summary_list)
   if(draw_gene_track){
@@ -283,12 +310,12 @@ track_plot = function(summary_list = NULL,
       par(mar = c(0.5, 1, 2, 1))  
     }
     
-    plot(NA, xlim = c(start, end), ylim = c(0, plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+    plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
     rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
     if(show_axis){
-      axis(side = 2, at = c(0, plot_height[idx]), las = 2)  
+      axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
     }else{
-      text(x = start, y = plot_height[idx], labels = paste0("[0-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
+      text(x = start, y = plot_height[idx], labels = paste0("[", plot_height_min[idx], "-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
     }
     #plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
     
@@ -747,7 +774,7 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
     window_dat = data.table::rbindlist(l = list(window_dat, data.table::data.table(start, end = start + window_size)), fill = TRUE)
     start = start + window_size
   }
-  window_dat[, chr := chr]
+  window_dat$chr = chr
   window_dat = window_dat[, .(chr, start, end)]
   
   op_dir = paste0(op_dir, "/")
