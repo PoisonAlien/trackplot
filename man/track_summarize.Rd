@@ -11,7 +11,7 @@ track_summarize(summary_list = NULL, condition = NULL, stat = "mean")
 
 \item{condition}{Default NULL. Provide condition for each bigWig file}
 
-\item{stat}{can be `mean, median`, `max`, `min`. NAs are excluded.}
+\item{stat}{can be \verb{mean, median}, \code{max}, \code{min}. NAs are excluded.}
 }
 \description{
 Summarize tracks per condition

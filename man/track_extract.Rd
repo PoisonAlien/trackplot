@@ -6,14 +6,19 @@
 \usage{
 track_extract(
   bigWigs = NULL,
+  bed = NULL,
   loci = NULL,
   binsize = 50,
   custom_names = NULL,
-  nthreads = 1
+  nthreads = 1,
+  query_ucsc = TRUE,
+  build = "hg38"
 )
 }
 \arguments{
 \item{bigWigs}{bigWig files. Default NULL. Required.}
+
+\item{bed}{narrowPeak or broadPeak files. This argument is mutually exclusive with bigWigs.}
 
 \item{loci}{target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003}
 
@@ -22,7 +27,16 @@ track_extract(
 \item{custom_names}{Default NULL and Parses from the file names.}
 
 \item{nthreads}{Default 1. Number of threads to use.}
+
+\item{query_ucsc}{Default TRUE. Queries UCSC and extracts gene models and cytoband for the loci. Requires \code{mysql} installation.}
+
+\item{build}{Reference genome build. Default hg38}
 }
 \description{
 Extract bigWig track data for the given loci
+}
+\examples{
+bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
+oct4_loci = "chr6:31125776-31144789"
+t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
 }

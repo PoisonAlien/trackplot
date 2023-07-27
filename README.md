@@ -1,3 +1,9 @@
+## trackplot - Fast and easy visualisation of bigWig files in R
+
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+<!-- badges: end -->
+
 ## Introduction
 
 `trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files. 
@@ -17,15 +23,15 @@ source("https://github.com/PoisonAlien/trackplot/blob/master/R/trackplot.R?raw=t
 download.file(url = "https://raw.githubusercontent.com/PoisonAlien/trackplot/master/R/trackplot.R", destfile = "trackplot.R")
 source('trackplot.R') 
 
-
 # OR If you prefer to have it as package
+
 remotes::install_github(repo = "poisonalien/trackplot")
 ```
 
 Features:
 
   * It's significantly fast since most of the heavy lifting is done by `bwtool`. Below examples took less than 2 minutes on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
-  * Automatically queries UCSC genome browser for gene models and cytobands, making analysis reproducible.
+  * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks, making analysis reproducible.
   * Supports GTF and standard UCSC gene formats as well.
   * Lightweight and minimal dependency 
     - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
@@ -33,53 +39,58 @@ Features:
   * Customization: Each plot can customized for color, scale, width, etc.
   * Tracks can be summarized per condition (by mean, median, max, min)
 
-### Usage
+## Usage
 
-### trackplots
+## trackplots
 
 `track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files. Additionally, `track_summarize` can summarize tracks by condition.
  
+### Step-1: Extract signal from bigWig files 
 ```r
 #Path to bigWig files
-bigWigs = c("CD34.bw", "EC.bw", "LC.bw", "CD4p.bw", "CD8p.bw")
+bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
 
-#Step-1. Extract the siganl for your loci of interst
-track_data = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003")
+#Region to plot
+oct4_loci = "chr6:31125776-31144789"
 
-#Step-1a (optional). Summarize trcks by condition
-track_data = track_summarize(summary_list = track_data, condition = c("A", "B", "B", "C", "D"), stat = "mean")
-
-#Step-2. 
-#Basic Plot 
-track_plot(summary_list = track_data)
-
-#With gene models (by default autoamtically queries UCSC genome browser for hg19 transcripts)
-track_plot(summary_list = track_data, draw_gene_track = TRUE, build = "hg38")
-
-#With GTF file as source for gene models
-track_plot(summary_list = track_data, draw_gene_track = TRUE, gene_model = "hg38_refseq.gtf.gz", isGTF = TRUE)
-
-#Heighlight regions of interest
-
-markregions = data.frame(
-    chr = c("chr3", "chr3"),
-    start = c(187743255, 187735888),
-    end = c(187747473, 187736777),
-    name = c("Promoter-1", "Promoter-2")
-  )
-  
-track_plot(
-  summary_list = track_data,
-  draw_gene_track = TRUE,
-  show_ideogram = TRUE,
-  build = "hg38",
-  regions = markregions
-)
+#Extract bigWig signal
+t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
 ```
 
-![](https://user-images.githubusercontent.com/8164062/101162153-3deae100-3632-11eb-8fad-66706f53ffe8.png)
 
-### profileplot()
+### Step-2: Plot
+Basic plot
+```r
+trackplot::track_plot(summary_list = t)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/01a5eb85-ab59-4884-89d6-fc5c46d696fa)
+
+Add cytoband and change colors for each track
+```r
+trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/829ef6e2-9981-4271-9cb8-3f30999ae884)
+
+Add TF binding sites at the top (any bed files would do)
+```r
+oct4_nanog_peaks = c("H1_Nanog.bed","H1_Oct4.bed")
+trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE, peaks = oct4_nanog_peaks, peaks_track_names = c("NANOG", "OCT4"))
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/2531af5e-7200-478e-aa90-4ff5f537f57a)
+
+Add some chromHMM tracks to the bottom
+```r
+chromHMM_peaks = "H1_chromHMM.bed"
+
+trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE, peaks = oct4_nanog_peaks, peaks_track_names = c("NANOG", "OCT4"), chromHMM = chromHMM_peaks)
+```
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/5ef8d09f-1bdf-4622-9367-4245bdec63d5)
+
+
+## profileplots
 
 `profile_extract()` and `profile_plot()` are functions to generate density based profile-plots from bigWig files.
 
@@ -112,9 +123,9 @@ profile_plot(profile_data)
 
 ![](https://user-images.githubusercontent.com/8164062/100755019-05f25c80-33ec-11eb-900e-a9595d443f0f.png)
 
-### bwpcaplot()
+## PCAplots
 
-`bwpcaplot()` is a function to perform PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts. Plot data and region summaries returned to the user.
+`pca_plot()` is a function to perform PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts. Plot data and region summaries returned to the user.
 
 ```r
 #PCA using UCSC protein coding reference transcripts (TSS+/- 2500 bp)
@@ -143,7 +154,7 @@ pca_plot(summary_list = bed_summary)
 * [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). 
 Or, you could also add the path where bwtool is located to R session with the below command.
 
-```
+```r
 #Example
 Sys.setenv(PATH = paste("/Users/anand/Documents/bwtool_dir/", Sys.getenv("PATH"), sep=":"))
 ```

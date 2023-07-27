@@ -8,7 +8,6 @@ extract_summary(
   bigWigs = NULL,
   bed = NULL,
   binSize = 50,
-  top = 1000,
   nthreads = 4,
   ucsc_assembly = NULL,
   ucsc_startFrom = "start",
@@ -26,13 +25,13 @@ extract_summary(
 
 \item{nthreads}{Default 4}
 
-\item{ucsc_assembly}{If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
+\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
 
 \item{ucsc_startFrom}{Default "center". Can be "center", "start" or "end"}
 
-\item{ucsc_up}{extend upstream by this many bps from `startFrom`. Default 2500}
+\item{ucsc_up}{extend upstream by this many bps from \code{startFrom}. Default 2500}
 
-\item{ucsc_down}{extend downstream by this many bps from `startFrom`. Default 2500}
+\item{ucsc_down}{extend downstream by this many bps from \code{startFrom}. Default 2500}
 
 \item{custom_names}{Default NULL and Parses from the file names.}
 }

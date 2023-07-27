@@ -25,11 +25,11 @@ profile_extract(
 
 \item{startFrom}{Default "center". Can be "center", "start" or "end"}
 
-\item{up}{extend upstream by this many bps from `startFrom`. Default 2500}
+\item{up}{extend upstream by this many bps from \code{startFrom}. Default 2500}
 
-\item{down}{extend downstream by this many bps from `startFrom`. Default 2500}
+\item{down}{extend downstream by this many bps from \code{startFrom}. Default 2500}
 
-\item{ucsc_assembly}{If `bed` file not provided, setting `ucsc_assembly` to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
+\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
 
 \item{nthreads}{Default 4}
 

@@ -7,10 +7,18 @@
 pca_plot(
   summary_list = NULL,
   top = 1000,
+  xpc = "PC1",
+  ypc = "PC2",
+  size = 1,
   color = NULL,
   condition = NULL,
   condition_colors = NULL,
-  show_cree = TRUE
+  condition_pch = NULL,
+  show_cree = TRUE,
+  lab_size = 1,
+  log2 = FALSE,
+  legendpos = "topright",
+  legend_size = 1
 )
 }
 \arguments{
@@ -18,13 +26,29 @@ pca_plot(
 
 \item{top}{Top most variable peaks to consider for PCA. Default 1000}
 
+\item{xpc}{Default PC1}
+
+\item{ypc}{Default PC2}
+
+\item{size}{Point size. Default 1}
+
 \item{color}{Manual colors for each bigWig. Default NULL.}
 
 \item{condition}{Default. Condition associated with each bigWig. Lines will colord accordingly.}
 
 \item{condition_colors}{Manual colors for each level in condition. Default NULL.}
 
+\item{condition_pch}{Manual plotting character for each level in condition. Default 21.}
+
 \item{show_cree}{If TRUE draws a cree plot. Default TRUE}
+
+\item{lab_size}{Font size for labels. Default 1}
+
+\item{log2}{log transform data? Default FALSE. IF TRUE, adds a small positive value and log2 converts.}
+
+\item{legendpos}{Default topright}
+
+\item{legend_size}{Default 1}
 }
 \description{
 Draw a PCA plot

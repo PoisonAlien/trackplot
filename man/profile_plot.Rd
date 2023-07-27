@@ -25,7 +25,7 @@ profile_plot(
 
 \item{condition_colors}{Manual colors for each level in condition. Default NULL.}
 
-\item{collapse_replicates}{Default FALSE. If TRUE and when `condition` is given, collapse signals samples belonging to same condition}
+\item{collapse_replicates}{Default FALSE. If TRUE and when \code{condition} is given, collapse signals samples belonging to same condition}
 
 \item{plot_se}{Default FALSE. If TRUE plots standard error shading}
 

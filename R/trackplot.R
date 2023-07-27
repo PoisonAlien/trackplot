@@ -9,9 +9,15 @@
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
-# Version: 1.3.10
-#
 # Changelog:
+# Version: 1.4.00 [2023-07-27]
+#   * Updated track_plot to include chromHMM tracks and top peaks tracks
+#   * Support to draw narrowPeak or boradPeak files with track_plot
+#   * Support to query ucsc for chromHMM tracks
+#   * Additional arguments to track_plot to adjust heights of all the tracks and margins
+#   * Improved track_extract - (extracts gene models and cytobands to avoid repetitive calling ucsc genome browser)
+#   * Additional arguments to pca_plot for better plotting
+#   * Added example datasets
 # Version: 1.3.10 [2021-10-06]
 #   * Support for negative values (Issue: https://github.com/PoisonAlien/trackplot/issues/6 )
 #   * Added y_min argument to track_plot. 
@@ -39,14 +45,38 @@
 
 #' Extract bigWig track data for the given loci
 #' @param bigWigs bigWig files. Default NULL. Required.
+#' @param bed narrowPeak or broadPeak files. This argument is mutually exclusive with bigWigs.
 #' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
 #' @param binsize bin size to extract signal. Default 50 (bps).
 #' @param nthreads Default 1. Number of threads to use.
 #' @param custom_names Default NULL and Parses from the file names.
+#' @param query_ucsc Default TRUE. Queries UCSC and extracts gene models and cytoband for the loci. Requires `mysql` installation.
+#' @param build Reference genome build. Default hg38
+#' @import data.table
+#' @examples
+#' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
+#' oct4_loci = "chr6:31125776-31144789"
+#' t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
 #' @export
-track_extract = function(bigWigs = NULL, loci = NULL, binsize = 50, custom_names = NULL, nthreads = 1){
+track_extract = function(bigWigs = NULL, bed = NULL, loci = NULL, binsize = 50, custom_names = NULL, nthreads = 1, query_ucsc = TRUE, build = "hg38"){
+  
+  if(all(is.null(bed), is.null(bigWigs))){
+    stop("Please provide bigWigs or bed [narrowPeak or broadPeak] files")
+  }
+  
+  if(all(!is.null(bed), !is.null(bigWigs))){
+    stop("Please provide either bigWigs or bed [narrowPeak or broadPeak] files")
+  }
+  
+  #Check if inputs are bigWig
+  input_bw = ifelse(test = is.null(bed), yes = TRUE, no = FALSE)
+  print(input_bw)
+  
   .check_windows()
-  .check_bwtool()
+  if(input_bw){
+    .check_bwtool()  
+  }
+  
   .check_dt()
   
   options(warn = -1)
@@ -56,10 +86,10 @@ track_extract = function(bigWigs = NULL, loci = NULL, binsize = 50, custom_names
   if(is.null(loci)){
     stop("Missing loci. Provide a target region to plot.\n  Should be of format \"chr:start-end\". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003")
   }else{
-    chr = as.character(unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 1)))
-    start = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 2)), split = "-"))[1]
+    chr = as.character(unlist(data.table::tstrsplit(x = loci, split = ":", keep = 1)))
+    start = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, split = ":", keep = 2)), split = "-"))[1]
     start = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(start))))
-    end = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, spli = ":", keep = 2)), split = "-"))[2]
+    end = unlist(data.table::tstrsplit(x = unlist(data.table::tstrsplit(x = loci, split = ":", keep = 2)), split = "-"))[2]
     end = as.numeric(as.character(gsub(pattern = ",", replacement = "", x = as.character(end))))
   }
   
@@ -68,28 +98,53 @@ track_extract = function(bigWigs = NULL, loci = NULL, binsize = 50, custom_names
   }
   message("    Queried region: ", chr, ":", start, "-", end, " [", end-start, " bps]")
   
-  if(is.null(bigWigs)){
-    stop("Provide at-least one bigWig file")
-  }
   message("Checking for files..")
-  for(i in 1:length(bigWigs)){
-    if(!file.exists(as.character(bigWigs)[i])){
-      stop(paste0(as.character(bigWigs)[i], " does not exist!"))
+  
+  if(input_bw){
+    input_files = bigWigs
+  }else{
+    input_files = bed
+  }
+  
+  for(i in 1:length(input_files)){
+    if(!file.exists(as.character(input_files)[i])){
+      stop(paste0(as.character(input_files)[i], " does not exist!"))
     }
   }
   
   if(!is.null(custom_names)){
-    if(length(custom_names) != length(bigWigs)){
-      stop("Please provide names for all bigWigs")
+    if(length(custom_names) != length(input_files)){
+      stop("Please provide names for all input files")
     }
   }
   
-  windows = .gen_windows(chr = chr, start = start, end = end, window_size = binsize, op_dir = op_dir)
-  track_summary = .get_summaries(bedSimple = windows, bigWigs = bigWigs, op_dir = op_dir, nthreads = nthreads)
+  if(input_bw){
+    windows = .gen_windows(chr = chr, start = start, end = end, window_size = binsize, op_dir = op_dir)
+    track_summary = .get_summaries(bedSimple = windows, bigWigs = bigWigs, op_dir = op_dir, nthreads = nthreads)  
+  }else{
+    track_summary = .get_summaries_narrowPeaks(bigWigs = bed, nthreads = nthreads, chr, start, end)  
+  }
+  
+  
   if(!is.null(custom_names)){
     names(track_summary) = custom_names  
   }
   track_summary$loci = c(chr, start, end)
+  
+  #Extract gene models for this region
+  if(query_ucsc){
+    message("Querying UCSC genome browser for gene model and cytoband..")
+    etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = NULL, genename = NULL)
+    cyto = .extract_cytoband(chr = chr, refBuild = build)
+  }else{
+    cyto = etbl = NA
+    
+  }
+  track_summary$etbl = etbl
+  track_summary$cyto = cyto
+  attr(track_summary, "is_bw") = input_bw
+  attr(track_summary, "refbuild") = build
+  
   track_summary
 }
 
@@ -111,7 +166,15 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
   stat = match.arg(arg = stat, choices = c("mean", "median", "max", "min"))
   
   loci = summary_list$loci
+  etbl = summary_list$etbl
+  cyto = summary_list$cyto
+  is_bw = attr(summary_list, "is_bw")
+  build = attr(summary_list, "refbuild")
+  
   summary_list$loci = NULL
+  summary_list$etbl = NULL
+  summary_list$cyto = NULL
+  
   if(length(condition) != length(summary_list)){
     stop("Incorrect conditions! Provide condition for each bigWig file.")
   }
@@ -119,6 +182,7 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
   names(summary_list) = condition
   
   summary_list = data.table::rbindlist(l = summary_list, use.names = TRUE, fill = TRUE, idcol = "sample_name")
+  print(summary_list)
   
   if(stat == "mean"){
     summary_list = summary_list[,mean(max, na.rm = TRUE), .(sample_name, chromosome, start, end)]  
@@ -133,15 +197,17 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
   colnames(summary_list)[ncol(summary_list)] = "max" #this column name means nothing, just using it for the consistency
   summary_list = split(summary_list, summary_list$sample_name)
   summary_list$loci = loci
+  summary_list$etbl = etbl
+  summary_list$cyto = cyto
+  attr(summary_list, "is_bw") = is_bw
+  attr(summary_list, "refbuild") = build
   summary_list
 }
 
 #' Generate IGV style locus tracks with ease
 #' @param summary_list Output from track_extract
 #' @param draw_gene_track Default FALSE. If TRUE plots gene models overlapping with the queried region
-#' @param query_ucsc Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.
 #' @param show_ideogram Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when `query_ucsc` is TRUE. 
-#' @param build Genome build. Default `hg19`
 #' @param txname transcript name to draw. Default NULL. Plots all transcripts overlapping with the queried region
 #' @param genename gene name to draw. Default NULL. Plots all genes overlapping with the queried region
 #' @param collapse_txs Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
@@ -152,41 +218,67 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param y_max custom y axis upper limits for each track. Recycled if required.
 #' @param y_min custom y axis lower limits for each track. Recycled if required.
 #' @param gene_fsize Font size. Default 1
-#' @param gene_track_height Default 2 
-#' @param scale_track_height Default 1
 #' @param col Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track
 #' @param show_axis Default FALSE
 #' @param track_names Default NULL
 #' @param track_names_pos Default 0 (corresponds to left corner)
+#' @param track_names_to_left If TRUE, track names are shown to the left of the margin. Default FALSE, plots on top as a title
 #' @param regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
 #' @param boxcol color for highlighted region. Default "#192A561A"
 #' @param boxcolalpha Default 0.5
+#' @param ucscChromHMM Name of the chromHMM table. Use .get_ucsc_hmm_tbls() to see the details.
+#' @param chromHMM chromHMM data. Can be path to bed files or a list data.frames with first three columns containing chr,start,end and a 4th column containing integer coded state
+#' @param chromHMM_names name for the chromHMM track
+#' @param chromHMM_cols A named vector for each state (in the 4th column of chromHMM file). Default NULL
+#' @param peaks bed file to be highlighted. Can be path to bed files or a list data.frames with first three columns containing chr,start,end.
+#' @param peaks_track_names Provide a name for each loci bed file. Default NULL
+#' @param cytoband_track_height Default 1
+#' @param chromHMM_track_height Default 1
+#' @param gene_track_height Default 2 
+#' @param scale_track_height Default 1
+#' @param peaks_track_height Default 2.
+#' @param bw_track_height Default 3
+#' @param left_mar Space to the left. Default 4
+#' @examples
+#' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) |> rev()
+#' oct4_loci = "chr6:31125776-31144789"
+#' t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+#' trackplot::track_plot(summary_list = t)
 #' @export
 track_plot = function(summary_list = NULL,
                       draw_gene_track = TRUE,
-                      query_ucsc = TRUE,
                       show_ideogram = FALSE,
-                      build = "hg19",
                       col = "gray70",
-                      groupAutoScale = TRUE,
+                      groupAutoScale = FALSE,
                       groupScaleByCondition = FALSE,
                       y_max = NULL,
                       y_min = NULL,
                       txname = NULL,
                       genename = NULL,
-                      gene_track_height = 2,
-                      scale_track_height = 1,
-                      show_axis = TRUE,
-                      gene_fsize = 0.6,
+                      show_axis = FALSE,
+                      gene_fsize = 1,
                       track_names = NULL,
                       track_names_pos = 0,
+                      track_names_to_left = FALSE,
                       regions = NULL,
-                      region_width = 1,
                       collapse_txs = TRUE,
                       boxcol = "#192A561A",
                       boxcolalpha = 0.2,
                       gene_model = NULL,
-                      isGTF = FALSE
+                      isGTF = FALSE,
+                      chromHMM = NULL,
+                      chromHMM_cols = NULL,
+                      chromHMM_names = NULL,
+                      ucscChromHMM = NULL,
+                      peaks = NULL,
+                      bw_track_height = 3,
+                      peaks_track_height = 2,
+                      gene_track_height = 2,
+                      scale_track_height = 2,
+                      chromHMM_track_height = 1,
+                      cytoband_track_height = 2,
+                      peaks_track_names = NULL,
+                      left_mar = NULL
 ){
   
   if(is.null(summary_list)){
@@ -196,8 +288,14 @@ track_plot = function(summary_list = NULL,
   chr = summary_list$loci[1]
   start = as.numeric(summary_list$loci[2])
   end = as.numeric(summary_list$loci[3])
+  etbl = summary_list$etbl
+  cyto = summary_list$cyto
+  is_bw = attr(summary_list, "is_bw")
+  build = attr(summary_list, "refbuild")
   
   summary_list$loci = NULL
+  summary_list$etbl = NULL
+  summary_list$cyto = NULL
   
   if(length(col) != length(summary_list)){
     col = rep(x = col, length(summary_list))
@@ -269,92 +367,224 @@ track_plot = function(summary_list = NULL,
   }
   
   ntracks = length(summary_list)
-  if(draw_gene_track){
-    if(is.null(gene_model)){
-      if(query_ucsc){
-        message("Missing gene model. Trying to query UCSC genome browser..")
-        etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = txname, genename = genename)
-        if(show_ideogram){
-          #lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(region_width, rep(3, ntracks), gene_track_height, scale_track_height))
-          lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(3, ntracks), gene_track_height, scale_track_height, 1))
-        }else{
-          lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_track_height, scale_track_height))  
-        }
-      }else{
-        etbl = NULL
-        lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_track_height))  
-      }
+  
+  lo = .make_layout(ntracks = ntracks, ntracks_h = bw_track_height, cytoband = show_ideogram, cytoband_h = cytoband_track_height, genemodel = draw_gene_track, 
+               genemodel_h = gene_track_height, chrHMM = any(!is.null(ucscChromHMM), !is.null(chromHMM)), chrHMM_h = chromHMM_track_height, loci = !is.null(peaks), 
+               loci_h = peaks_track_height, scale_track_height = scale_track_height)
+  
+  query = data.table::data.table(chr = chr, start = start, end = end)
+  data.table::setkey(x = query, chr, start, end)
+  
+  if(is.null(left_mar)){
+    left_mar = ifelse(test = show_axis, yes = 4, no = 2)
+  }
+  
+  #Draw top peaks
+  if(!is.null(peaks)){
+    
+    if(is.list(peaks)){
+      peaks_data = lapply(peaks, function(l){
+        colnames(l)[1:3] = c("chr", "start", "end")
+        data.table::setDT(l, key = c("chr", "start", "end"))
+        l
+      })
     }else{
-      if(isGTF){
-        etbl = .parse_gtf(gtf = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
-      }else{
-        etbl = .extract_geneModel(ucsc_tbl = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)  
-      }
-      
-      lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), gene_track_height, scale_track_height))
+      peaks_data = lapply(peaks, function(l){
+        l = data.table::fread(file = l)
+        colnames(l)[1:3] = c("chr", "start", "end")
+        data.table::setDT(l, key = c("chr", "start", "end"))
+        l
+      })
     }
-  }else{
-    if(all(c(query_ucsc, show_ideogram))){
-      lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(3, ntracks), scale_track_height, 1))  
+    
+    if(is.null(peaks_track_names)){
+      names(peaks_data) = paste0("Bed", 1:length(peaks_data))  
     }else{
-      lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(3, ntracks), scale_track_height))    
+      names(peaks_data) = peaks_track_names
     }
+    
+    if(show_axis){
+      par(mar = c(0.25, left_mar, 0.25, 1))
+    }else{
+      par(mar = c(0.25, left_mar, 0.25, 1))  
+    }
+    
+    plot(NA, xlim = c(start, end), ylim = c(0, length(peaks)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+    
+    lapply(seq_along(peaks_data), function(idx){
+      l_idx = peaks_data[[idx]]
+      l_idx = data.table::foverlaps(x = query, y = l_idx, type = "any", nomatch = NULL)[,.(chr, start, end)]
+      rect(xleft = start, ybottom = idx - 0.49, xright = end, ytop = idx - 0.51, col = "gray90", border = NA)
+      rect(xleft = l_idx$start, ybottom = idx - 0.9, xright = l_idx$end, ytop = idx - 0.1, col = "#34495e", border = NA)
+      text(x = start, y = idx - 0.5, labels = names(peaks_data)[idx], adj = 1.2, xpd = TRUE)
+    })
   }
   
   #Draw bigWig signals
-  lapply(1:length(summary_list), function(idx){
-    x = summary_list[[idx]]
-    if(show_axis){
-      par(mar = c(0.5, 4, 2, 1))
-    }else{
-      par(mar = c(0.5, 1, 2, 1))  
-    }
-    
-    plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-    rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
-    if(show_axis){
-      axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
-    }else{
-      text(x = start, y = plot_height[idx], labels = paste0("[", plot_height_min[idx], "-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
-    }
-    #plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-    
-    if(plot_regions){
-      # boxcol = "#192a56"
-      boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
-      if(nrow(regions) > 0){
-        for(i in 1:nrow(regions)){
-          if(idx == length(summary_list)){
-            #If its a last plot, draw rectangle till 0
-            rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
-          }else if (idx == 1){
-            if(ncol(regions) > 3){
-              text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+  if(is_bw){
+    lapply(1:length(summary_list), function(idx){
+      x = summary_list[[idx]]
+      if(show_axis){
+        par(mar = c(0.5, left_mar, 2, 1))
+      }else{
+        par(mar = c(0.5, left_mar, 2, 1))  
+      }
+      
+      plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
+      if(show_axis){
+        axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
+      }else{
+        text(x = start, y = plot_height[idx], labels = paste0("[", plot_height_min[idx], "-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
+      }
+      #plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      
+      if(plot_regions){
+        # boxcol = "#192a56"
+        boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
+        if(nrow(regions) > 0){
+          for(i in 1:nrow(regions)){
+            if(idx == length(summary_list)){
+              #If its a last plot, draw rectangle till 0
+              rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
+            }else if (idx == 1){
+              if(ncol(regions) > 3){
+                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+              }else{
+                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+              }
+              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
             }else{
-              text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)  
             }
-            rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
-          }else{
-            rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)  
           }
         }
       }
+      
+      if(track_names_to_left){
+        text(x = start, y = (plot_height_min[idx] + plot_height[idx])/2, labels = names(summary_list)[idx], adj = 1.1, cex = gene_fsize, xpd = TRUE)
+      }else{
+        title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)  
+      }
+      
+    })
+    
+  }else{
+    lapply(1:length(summary_list), function(idx){
+      x = summary_list[[idx]]
+      if(show_axis){
+        par(mar = c(0, left_mar, 0, 1))
+      }else{
+        par(mar = c(0.5, left_mar, 1, 1))  
+      }
+      
+      plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      cols = cut(x$max, breaks = c(0, 166, 277, 389, 500, 612, 723, 834, 945, max(x$max)), labels = c("#FFFFFF", "#F0F0F0", "#D9D9D9", "#BDBDBD", "#969696", "#737373", 
+                                                                                               "#525252", "#252525", "#000000"))
+      rect(xleft = x$start, ybottom = 0.01, xright = x$end, ytop = 0.99, col = as.character(cols), border = NA)
+      
+      if(plot_regions){
+        # boxcol = "#192a56"
+        boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
+        if(nrow(regions) > 0){
+          for(i in 1:nrow(regions)){
+            if(idx == length(summary_list)){
+              #If its a last plot, draw rectangle till 0
+              rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
+            }else if (idx == 1){
+              if(ncol(regions) > 3){
+                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+              }else{
+                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
+              }
+              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
+            }else{
+              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)  
+            }
+          }
+        }
+      }
+      
+      if(track_names_to_left){
+        text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
+        #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
+        #title(main = , adj = track_names_pos, font.main = 3)  
+      }else{
+        title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+      }
+      
+    })
+    
+  }
+  
+  #Draw chrom HMM tracks
+  plotHMM = FALSE
+  if(!is.null(chromHMM)){
+    if(is.list(chromHMM)){
+      chromHMM = lapply(chromHMM, function(l){
+        colnames(l)[1:4] = c("chr", "start", "end", "name")
+        data.table::setDT(l, key = c("chr", "start", "end"))
+        l
+      })
+    }else{
+      chromHMM = lapply(chromHMM, function(l){
+        l = data.table::fread(file =  l)
+        colnames(l)[1:4] = c("chr", "start", "end", "name")
+        data.table::setDT(l, key = c("chr", "start", "end"))
+      })
     }
     
-    title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
-  })
+    hmmdata = lapply(chromHMM, function(hmm){
+      .load_chromHMM(chr = chr, start = start, end = end, ucsc = hmm)
+      #.extract_chromHmm_ucsc()
+    })
+    
+    if(is.null(chromHMM_names)){
+      names(hmmdata) = paste0("chromHMM_", 1:length(hmmdata))
+    }
+    
+    plotHMM = TRUE
+  }else if(!is.null(ucscChromHMM)){
+    hmmdata = lapply(ucscChromHMM, function(hmmtbl){
+      .extract_chromHmm_ucsc(chr = chr, start = start, end = end, refBuild = build, tbl = hmmtbl)
+    })
+    names(hmmdata) = ucscChromHMM
+    plotHMM = TRUE
+    #return(hmmdata)
+  }
+  
+  if(plotHMM){
+    if(show_axis){
+      par(mar = c(0.1, left_mar, 0, 1))
+    }else{
+      par(mar = c(0.1, left_mar, 0, 1))  
+    }
+    
+    if(is.null(chromHMM_cols)){
+      chromHMM_cols = .get_ucsc_hmm_states_cols()
+    }
+    
+    .plot_ucsc_chrHmm(d = hmmdata, start = start, end = end, hmm_cols = chromHMM_cols)
+  }
   
   #Draw gene models
   if(draw_gene_track){
+    
+    if(isGTF){
+      etbl = .parse_gtf(gtf = gene_model, chr = chr, start = start, end = end, txname = txname, genename = genename)
+    }else{
+      etbl = .make_exon_tbl(gene_models = etbl, txname = txname, genename = genename)
+    }
+    
     if(!is.null(etbl)){
       if(collapse_txs){
         etbl = .collapse_tx(etbl)
       }
       
       if(show_axis){
-        par(mar = c(0.25, 4, 0, 0.5))
+        par(mar = c(0.25, left_mar, 0, 1))
       }else{
-        par(mar = c(0.25, 1, 0, 0.5))  
+        par(mar = c(0.25, left_mar, 0, 1))  
       }
       
       plot(NA, xlim = c(start, end), ylim = c(0, length(etbl)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
@@ -362,11 +592,11 @@ track_plot = function(summary_list = NULL,
       for(tx_id in 1:length(etbl)){
         txtbl = etbl[[tx_id]]
         segments(x0 = attr(txtbl, "start"), y0 = tx_id-0.45, x1 = attr(txtbl, "end"), y1 = tx_id-0.45, col = exon_col, lwd = 1)
-        
+        name_at = min(c(txtbl[[1]], txtbl[[2]]))
         if(is.na(attr(txtbl, "tx"))){
-          text(x = start, y = tx_id-0.45, labels = paste0(attr(txtbl, "gene")), adj = 0, cex = gene_fsize)
+          text(x = name_at, y = tx_id-0.45, labels = paste0(attr(txtbl, "gene")), adj = 1, cex = gene_fsize, xpd = TRUE, pos = 2) #x = start for outer margin
         }else{
-          text(x = start, y = tx_id-0.45, labels = paste0(attr(txtbl, "tx"), " [", attr(txtbl, "gene"), "]"), cex = gene_fsize, adj = 0)  
+          text(x = name_at, y = tx_id-0.45, labels = paste0(attr(txtbl, "tx"), " [", attr(txtbl, "gene"), "]"), cex = gene_fsize, adj = 0, xpd = TRUE, pos = 2)  
         }
         
         rect(xleft = txtbl[[1]], ybottom = tx_id-0.75, xright = txtbl[[2]], ytop = tx_id-0.25, col = exon_col, border = NA)
@@ -385,31 +615,28 @@ track_plot = function(summary_list = NULL,
     }
   }
   
+  #Draw scale
   if(show_axis){
-    par(mar = c(0, 4, 0, 0))  
+    par(mar = c(0, left_mar, 0, 1))  
   }else{
-    par(mar = c(0, 1, 0, 0))
+    par(mar = c(0, left_mar, 0, 1))
   }
   lab_at = pretty(c(start, end))
+  lab_at_lab = ifelse(test = lab_at > 1e6, yes = paste0(lab_at/1e6, "M"), no = ifelse(lab_at > 100000, yes = paste0(lab_at/1e5, "K"), no = lab_at))
   plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
   rect(xleft = start, ybottom = 0.5, xright = end, ytop = 0.5, lty = 2, xpd = TRUE)
   rect(xleft = lab_at, ybottom = 0.45, xright = lab_at, ytop = 0.5, xpd = TRUE)
-  text(x = lab_at, y = 0.3, labels = lab_at)
+  text(x = lab_at, y = 0.2, labels = lab_at_lab, xpd = FALSE)
   #axis(side = 1, at = lab_at, lty = 2, line = -3)
-  text(x = end, y = 0.75, labels = paste0(chr, ":", start, "-", end), adj = 1, xpd = TRUE)
+  text(x = end, y = 0.9, labels = paste0(chr, ":", start, "-", end), adj = 1, xpd = TRUE)
   
-  if(all(c(query_ucsc, show_ideogram))){
-    cyto = .extract_cytoband(chr = chr, refBuild = build)
-    #par(fig = c(0, 1, 0, 0.05), new = TRUE)
-    if(show_axis){
-      par(mar = c(0, 4, 0, 0))  
-    }else{
-      par(mar = c(0, 1, 0, 0))
-    }
+  #Draw ideogram
+  if(show_ideogram){
+    par(mar = c(0.2, 1, 0, 1))
     plot(NA, xlim = c(0, max(cyto$end)), ylim = c(0, 1), axes = FALSE, frame.plot = FALSE, xlab = NA, ylab = NA)
     rect(xleft = cyto$start, ybottom = 0.1, xright = cyto$end, ytop = 0.6, col = cyto$color, border = "#34495e")
     rect(xleft = start, ybottom = 0, xright = end, ytop = 0.7, col = "#d35400", lwd = 2, border = "#d35400")
-    text(x = 0, y = 0.8, labels = chr, adj = 0, font = 2)
+    text(x = 0, y = 0.5, labels = chr, adj = 1.2, font = 2, xpd = TRUE)
   }
 }
 
@@ -582,7 +809,6 @@ profile_plot = function(sig_list = NULL, color = NULL, condition = NULL, conditi
   
 }
 
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # bwpcaplot function to perform PCA analysis based on genomic regions of interest or around TSS sites.
 
 #' Extract area under the curve for every peak from from given bigWig files.
@@ -596,7 +822,7 @@ profile_plot = function(sig_list = NULL, color = NULL, condition = NULL, conditi
 #' @param nthreads Default 4
 #' @param custom_names Default NULL and Parses from the file names.
 #' @export
-extract_summary = function(bigWigs = NULL, bed = NULL, binSize = 50, top = 1000,
+extract_summary = function(bigWigs = NULL, bed = NULL, binSize = 50,
                            nthreads = 4, ucsc_assembly = NULL, ucsc_startFrom = "start", ucsc_up = 2500, ucsc_down = 2500, custom_names = NULL){
   
   .check_windows()
@@ -672,12 +898,21 @@ extract_summary = function(bigWigs = NULL, bed = NULL, binSize = 50, top = 1000,
 #' Draw a PCA plot
 #' @param summary_list output from extract_summary
 #' @param top Top most variable peaks to consider for PCA. Default 1000
+#' @param xpc Default PC1
+#' @param ypc Default PC2
 #' @param color Manual colors for each bigWig. Default NULL. 
 #' @param condition Default. Condition associated with each bigWig. Lines will colord accordingly.
 #' @param condition_colors Manual colors for each level in condition. Default NULL. 
+#' @param condition_pch Manual plotting character for each level in condition. Default 21. 
 #' @param show_cree If TRUE draws a cree plot. Default TRUE
+#' @param size Point size. Default 1
+#' @param lab_size Font size for labels. Default 1
+#' @param legend_size Default 1
+#' @param log2 log transform data? Default FALSE. IF TRUE, adds a small positive value and log2 converts.
+#' @param legendpos Default topright
 #' @export
-pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = NULL, condition_colors = NULL, show_cree = TRUE){
+pca_plot = function(summary_list = NULL, top = 1000, xpc = "PC1", ypc = "PC2", size = 1, color = NULL, condition = NULL, condition_colors = NULL, 
+                    condition_pch = NULL, show_cree = TRUE, lab_size = 1, log2 = FALSE, legendpos = "topright", legend_size = 1){
   
   
   if(is.null(summary_list)){
@@ -708,13 +943,24 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
     }
     names(condition_colors) = group_df[,.N,condition][,condition]
     group_df$color = condition_colors[group_df$condition]
+  
+    if(!is.null(condition_pch)){
+      names(condition_pch) = group_df[,.N,condition][,condition]
+      group_df$pch = condition_pch[group_df$condition]
+    }else{
+      group_df$pch = 19
+    }
+    
   }else{
     group_df = data.table::data.table(sample = names(summary_list), color = color)
+    group_df$pch = 21
   }
   
-  
-  
+  if(log2){
+    sum_tbl = log2(x = sum_tbl + 0.1)
+  }
   sum_tbl = sum_tbl[complete.cases(sum_tbl),, drop = FALSE]
+  
   if(nrow(sum_tbl) < top){
     pca = prcomp(t(.order_by_sds(mat = sum_tbl)))
   }else{
@@ -723,28 +969,34 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
   
   pca_dat = as.data.frame(pca$x)
   pca_var_explained = pca$sdev^2/sum(pca$sdev^2)
+  names(pca_var_explained) = paste0("PC", 1:length(pca_var_explained))
   data.table::setDT(x = pca_dat, keep.rownames = "sample")
+  data.table::setDF(x = pca_dat)
   pca_dat = merge(pca_dat, group_df, by = 'sample')
   attr(pca_dat, "percentVar") <- round(pca_var_explained, digits = 3)
-  
+  #print(head(pca_dat))
   if(show_cree){
     lo = layout(mat = matrix(data = c(1, 2), ncol = 2))
   }
   
   grid_cols = "gray90"
   par(mar = c(3, 4, 1, 1))
-  plot(NA, axes = FALSE, xlab = NA, ylab = NA, cex = 1.2, xlim = range(pretty(pca_dat$PC1)), ylim = range(pretty(pca_dat$PC2)))
-  abline(h = pretty(pca_dat$PC2), v = pretty(pca_dat$PC1), col = grid_cols, lty = 2)
-  points(x = pca_dat$PC1, y = pca_dat$PC2, col = "black", bg = pca_dat$color, pch = 21, cex = 1.25)
-  axis(side = 1, at = pretty(pca_dat$PC1), cex.axis = 0.8)
-  axis(side = 2, at = pretty(pca_dat$PC2), las = 2, cex.axis = 0.8)
-  mtext(text = paste0("PC2 [", round(pca_var_explained[2], digits = 2), "]"), side = 2, line = 2.5, cex = 0.8)
-  mtext(text = paste0("PC1 [", round(pca_var_explained[1], digits = 2), "]"), side = 1, line = 2, cex = 0.8)
-  text(x = pca_dat$PC1, y = pca_dat$PC2, labels = pca_dat$sample, pos = 3, col = pca_dat$color, xpd = TRUE, cex = 0.8)
+  plot(NA, axes = FALSE, xlab = NA, ylab = NA, cex = 1.2, xlim = range(pretty(pca_dat[, xpc])), ylim = range(pretty(pca_dat[, ypc])))
+  abline(h = pretty(pca_dat[, xpc]), v = pretty(pca_dat[, ypc]), col = grid_cols, lty = 2, lwd = 0.1)
+  abline(h = 0, v = 0, col = grid_cols, lty = 2, lwd = 0.8)
+  points(x = pca_dat[, xpc], y = pca_dat[, ypc], col = pca_dat$color, bg = pca_dat$color, pch = pca_dat$pch, cex = size)
+  axis(side = 1, at = pretty(pca_dat[, xpc]), cex.axis = 0.8)
+  axis(side = 2, at = pretty(pca_dat[, ypc]), las = 2, cex.axis = 0.8)
+  mtext(text = paste0(xpc, " [", round(pca_var_explained[xpc], digits = 2), "]"), side = 1, line = 2, cex = 0.8)
+  mtext(text = paste0(ypc, " [", round(pca_var_explained[ypc], digits = 2), "]"), side = 2, line = 2, cex = 0.8)
+  text(x = pca_dat[, xpc], y = pca_dat[, ypc], labels = pca_dat$sample, pos = 3, col = pca_dat$color, xpd = TRUE, cex = lab_size)
   #title(main = NA, sub = paste0("N = ", top, " peaks"), adj = 0, outer = TRUE)
   
+  data.table::setDT(x = pca_dat)
   if(!is.null(condition)){
-    legend(x = "topright", legend = unique(pca_dat$condition), col = unique(pca_dat$color), bty = "n", pch = 19, cex = 0.8, xpd = TRUE, ncol = 2)
+    leg_dat = pca_dat[,.N,.(condition, color, pch)]
+    legend(x = legendpos, legend = leg_dat$condition, col = leg_dat$color, 
+           bty = "n", pch = leg_dat$pch, cex = legend_size, xpd = TRUE, ncol = 2)
   }
   
   if(show_cree){
@@ -763,6 +1015,75 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
 }
 
 #------------------------------------------------------------------------------------------------------------------------------------
+#                                                   Undocumented Accessory functions
+#------------------------------------------------------------------------------------------------------------------------------------
+
+.make_layout = function(ntracks, ntracks_h = 3, cytoband = TRUE, cytoband_h = 1, genemodel = TRUE, genemodel_h = 1, chrHMM = TRUE, chrHMM_h = 1, loci = TRUE, loci_h = 2, scale_track_height = 1){
+  
+  case = NULL
+  #print(paste(cytoband, genemodel, chrHMM, loci, sep = ", "))
+  
+  if(cytoband & genemodel & chrHMM & loci){
+    #print("all")
+    case = 1
+  }else if(cytoband & genemodel & chrHMM == FALSE & loci){
+    #print("no hmm")
+    case = 2
+  }else if(cytoband & genemodel & chrHMM == FALSE & loci == FALSE){
+    #print("no hmm and no loci")
+    case = 3
+  }else if(cytoband & genemodel == FALSE & chrHMM == FALSE & loci == FALSE){
+    #print("no hmm and no loci and no genemodel")
+    case = 4
+  }else if(cytoband == FALSE & genemodel == FALSE & chrHMM == FALSE & loci == FALSE){
+    #print("no hmm and no loci and no genemodel and no cytoband")
+    case = 5
+  }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == TRUE & loci == FALSE){
+    #print("no loci and no cytoband")
+    case = 6
+  }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == TRUE & loci == TRUE){
+    #print("no cytoband")
+    case = 7
+  }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == FALSE & loci == TRUE){
+    #print("no cytoband no chrHMM")
+    case = 8
+  }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == FALSE & loci == FALSE){
+    #print("no cytoband no chrHMM no loci")
+    case = 9
+  }else if(cytoband == TRUE & genemodel == TRUE & chrHMM == TRUE & loci == FALSE){
+    #print("no loci")
+    case = 10
+  }else if(cytoband == TRUE & genemodel == FALSE & chrHMM == FALSE & loci == TRUE){
+    #print("no genemodel no chrhmm")
+    case = 11
+  }else{
+    #print("Something is wrong!")
+  }
+  
+  if(case == 1){
+    lo = layout(mat = matrix(data = seq_len(ntracks+5)), heights = c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h))
+  }else if(case == 2){
+    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h))
+  }else if(case == 3){
+    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h))
+  }else if(case == 4){
+    lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(ntracks_h, ntracks), scale_track_height, cytoband_h))
+  }else if(case == 5){
+    lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(ntracks_h, ntracks), scale_track_height))
+  }else if(case == 6){
+    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height))
+  }else if(case == 7){
+    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height))
+  }else if(case == 8){
+    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height))
+  }else if(case == 9){
+    lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height))
+  }else if(case == 10){
+    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h))
+  }else if(case == 11){
+    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(loci_h, rep(ntracks_h, ntracks), scale_track_height, cytoband_h))
+  }
+}
 
 .gen_windows = function(chr = NA, start, end, window_size = 50, op_dir = getwd()){
   #chr = "chr19"; start = 15348301; end = 15391262; window_size = 50; op_dir = getwd()
@@ -925,6 +1246,59 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
   cyto
 }
 
+
+.load_chromHMM = function(chr, start, end, ucsc){
+  
+  if(nrow(ucsc) == 0){
+    message("No features found within the requested loci!")
+    return(NULL)
+  }
+  colnames(ucsc)[1:4] = c("chr", "start", "end", "name")
+  if(!grepl(pattern = "^chr", x = chr)){
+    ucsc[, chr := gsub(pattern = "^chr", replacement = "", x = chr)]
+  }
+  data.table::setkey(x = ucsc, chr, start, end)
+  
+  query = data.table::data.table(chr = chr, start = start, end = end)
+  data.table::setkey(x = query, chr, start, end)
+  
+  data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)[,.(chr, start, end, name)]
+}
+
+.extract_chromHmm_ucsc = function(chr, start, end, refBuild = "hg38", tbl){
+  
+  if(!grepl(pattern = "^chr", x = chr)){
+    message("Adding chr prefix to target chromosome for UCSC query..")
+    tar_chr = paste0("chr", chr)
+  }else{
+    tar_chr = chr
+  }
+  
+  ucsc_tbls = .get_ucsc_hmm_tbls()
+  tbl = match.arg(arg = tbl, choices = ucsc_tbls$TableName)
+  
+  .check_mysql()
+  
+  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
+  message(paste0("Extracting chromHMM from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  #system(command = cmd)
+  ucsc = data.table::fread(cmd = cmd)
+  if(nrow(ucsc) == 0){
+    message("No features found within the requested loci!")
+    return(NULL)
+  }
+  colnames(ucsc) = c("chr", "start", "end", "name")
+  if(!grepl(pattern = "^chr", x = chr)){
+    ucsc[, chr := gsub(pattern = "^chr", replacement = "", x = chr)]
+  }
+  data.table::setkey(x = ucsc, chr, start, end)
+  
+  query = data.table::data.table(chr = chr, start = start, end = end)
+  data.table::setkey(x = query, chr, start, end)
+  
+  data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)[,.(chr, start, end, name)]
+}
+
 .extract_geneModel_ucsc = function(chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
   .check_mysql()
   op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
@@ -959,35 +1333,69 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
     message("No features found within the requested loci! If you are not sure why..\n    1.Make sure there are no discripancies in chromosome names i.e, chr prefixes\n")
     return(NULL) 
   }else{
-    
-    if(!is.null(txname)){
-      gene_models = gene_models[name %in% txname]
-    }
-    
-    if(nrow(gene_models) == 0){
-      message("    Requested transcript ", txname, " does not exist within the queried region!\n    Skipping gene track plotting..")
-      return(NULL)
-    }
-    
-    if(!is.null(genename)){
-      gene_models = gene_models[name2 %in% genename]
-    }
-    
-    if(nrow(gene_models) == 0){
-      message("    Requested gene ", genename, " does not exist within the queried region!\n    Skipping gene track plotting..")
-      return(NULL)
-    }
-    
-    exon_tbls = lapply(seq_along(along.with = 1:nrow(gene_models)), function(idx){
-      exon_start = as.numeric(unlist(data.table::tstrsplit(x = gene_models[idx, exonStarts], split = ",")))
-      exon_end = as.numeric(unlist(data.table::tstrsplit(x = gene_models[idx, exonEnds], split = ",")))
-      exon_tbl = data.frame(start = exon_start, end = exon_end)
-      attributes(exon_tbl) = list(start = gene_models[idx, start], end = gene_models[idx, end], strand = gene_models[idx, strand], tx = gene_models[idx, name], gene = gene_models[idx, name2])
-      exon_tbl
-    })
-    
-    return(exon_tbls)
+    return(gene_models)
   }
+}
+
+.make_exon_tbl = function(gene_models, txname = NULL, genename = NULL){
+  if(!is.null(txname)){
+    gene_models = gene_models[name %in% txname]
+  }
+  
+  if(nrow(gene_models) == 0){
+    message("    Requested transcript ", txname, " does not exist within the queried region!\n    Skipping gene track plotting..")
+    return(NULL)
+  }
+  
+  if(!is.null(genename)){
+    gene_models = gene_models[name2 %in% genename]
+  }
+  
+  if(nrow(gene_models) == 0){
+    message("    Requested gene ", genename, " does not exist within the queried region!\n    Skipping gene track plotting..")
+    return(NULL)
+  }
+  
+  exon_tbls = lapply(seq_along(along.with = 1:nrow(gene_models)), function(idx){
+    exon_start = as.numeric(unlist(data.table::tstrsplit(x = gene_models[idx, exonStarts], split = ",")))
+    exon_end = as.numeric(unlist(data.table::tstrsplit(x = gene_models[idx, exonEnds], split = ",")))
+    exon_tbl = data.frame(start = exon_start, end = exon_end)
+    attributes(exon_tbl) = list(start = gene_models[idx, start], end = gene_models[idx, end], strand = gene_models[idx, strand], tx = gene_models[idx, name], gene = gene_models[idx, name2])
+    exon_tbl
+  })
+  
+  return(exon_tbls)
+}
+
+.get_ucsc_hmm_states_cols = function(){
+  states = c("red", "red4", "purple", "orange", "orange", "yellow", "yellow", 
+             "blue", "darkgreen", "darkgreen", "lightgreen", "gray", "gray90", 
+             "gray90", "gray90")
+  names(states) = 1:15
+  states
+}
+
+.plot_ucsc_chrHmm = function(d, start = NULL, end = NULL, hmm_cols = NULL){
+  #hmm_cols = .get_ucsc_hmm_states_cols()
+  
+  if(is.null(start)){
+    start = min(data.table::rbindlist(l = d, use.names = TRUE, fill = TRUE)[,start], na.rm = TRUE)  
+  }
+  
+  if(is.null(end)){
+    end = max(data.table::rbindlist(l = d, use.names = TRUE, fill = TRUE)[,end], na.rm = TRUE)
+  }
+  
+  plot(NA, ylim = c(0, length(d)), xlim = c(start, end), axes = FALSE, xlab = NA, ylab = NA)
+  lapply(seq_along(d), function(i){
+    di = d[[i]]
+    di$state = unlist(data.table::tstrsplit(x = di$name, split = "_", keep = 1))
+    rect(xleft = di$start, ybottom = i-0.9, xright = di$end, ytop = i-0.1, col = hmm_cols[di$state], border = NA)
+    di_name = gsub(pattern = "wgEncodeBroadHmm|HMM", replacement = "", x = names(d)[i])
+    text(x = start, y = i - 0.5, labels = di_name, adj = 1.2, xpd = TRUE)
+    #mtext(text = di_name, side = 2, line = 1, outer = TRUE, cex = 1)
+  })
+  
 }
 
 .collapse_tx = function(exon_tbls){
@@ -1310,7 +1718,7 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
   }
 }
 
-.check_mysql = function(warn = TRUE){
+.check_mysql = function(warn = FALSE){
   check = as.character(Sys.which(names = 'mysql'))[1]
   if(check != ""){
     if(warn){
@@ -1338,41 +1746,106 @@ pca_plot = function(summary_list = NULL, top = 1000, color = NULL, condition = N
   }
 }
 
+.get_ucsc_hmm_tbls = function(){
+  hmm = structure(
+    list(
+      TableName = c(
+        "wgEncodeBroadHmmGm12878HMM",
+        "wgEncodeBroadHmmH1hescHMM",
+        "wgEncodeBroadHmmHepg2HMM",
+        "wgEncodeBroadHmmHepg2HMM",
+        "wgEncodeBroadHmmHsmmHMM",
+        "wgEncodeBroadHmmHuvecHMM",
+        "wgEncodeBroadHmmK562HMM",
+        "wgEncodeBroadHmmNhekHMM",
+        "wgEncodeBroadHmmNhlfHMM"
+      ),
+      cell = c(
+        "GM12878",
+        "H1-hESC",
+        "HepG2",
+        "HMEC",
+        "HSMM",
+        "HUVEC",
+        "K562",
+        "NHEK",
+        "NHLF"
+      ),
+      Tier = c(1L,
+               1L, 2L, 3L, 3L, 2L, 1L, 3L, 3L),
+      Description = c(
+        "B-lymphocyte, lymphoblastoid",
+        "embryonic stem cells",
+        "hepatocellular carcinoma",
+        "mammary epithelial cells",
+        "skeletal muscle myoblasts",
+        "umbilical vein endothelial cells",
+        "leukemia",
+        "epidermal keratinocytes",
+        "lung fibroblasts"
+      ),
+      Lineage = c(
+        "mesoderm",
+        "inner cell mass",
+        "endoderm",
+        "ectoderm",
+        "mesoderm",
+        "mesoderm",
+        "mesoderm",
+        "ectoderm",
+        "endoderm"
+      ),
+      Tissue = c(
+        "blood",
+        "embryonic stem cell",
+        "liver",
+        "breast",
+        "muscle",
+        "blood vessel",
+        "blood",
+        "skin",
+        "lung"
+      ),
+      Karyotype = c(
+        "normal",
+        "normal",
+        "cancer",
+        "normal",
+        "normal",
+        "normal",
+        "cancer",
+        "normal",
+        "normal"
+      ),
+      Sex = c("F",
+              "M", "M", "U", "U", "U", "F", "U", "U")
+    ),
+    row.names = c(NA,-9L),
+    class = c("data.table", "data.frame")
+  )
+  
+  hmm
+}
+
+.get_summaries_narrowPeaks = function(bigWigs, nthreads = 1, chr = NA, start = NA, end = NA){
+  #bedSimple = temp_op_bed; bigWigs = list.files(path = "./", pattern = "bw"); op_dir = getwd(); nthreads = 1
+  query = data.table::data.table(chromosome = chr, start = start, end = end, key = c("chromosome", "start", "end"))
+  
+  message(paste0("Extracting signals"))
+  
+  summaries = parallel::mclapply(bigWigs, FUN = function(bw){
+    bn = unlist(data.table::tstrsplit(x =  basename(bw), split = "\\.", keep = 1))
+    message(paste0("    Processing ", bn, " .."))
+    bw = data.table::fread(file = bw)
+    colnames(bw)[c(1:3, 5)] = c("chromosome", "start", "end", "max")
+    data.table::setkeyv(x = bw, cols = c("chromosome", "start", "end"))
+    bw = data.table::foverlaps(x = query, y = bw, type = "any", nomatch = NULL)
+    bw[,.(chromosome, start, end, max)]
+  }, mc.cores = nthreads)
+  
+  names(summaries) = unlist(data.table::tstrsplit(x =  basename(bigWigs), split = "\\.", keep = 1))
+  summaries
+}
+
+
 #------------------------------------------------------------------------------------------------------------------------------------
-
-#Test
-# .run_test_trackplot = function(){
-#   #bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
-#   bigWigs = list.files(path = "/bigdisk/Aurore/Epigenomic_landscape_Adult_T-ALL/data/extdata/BLUEPRINT_final_data/H3K27ac/bigWigs/", pattern = "*\\.bw", full.names = TRUE)
-#   bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
-#   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
-# markregions = data.frame(
-#   chr = c("chr3", "chr3"),
-#   start = c(187743255, 187735888),
-#   end = c(187747473, 187736777),
-#   name = c("Promoter-1", "Promoter-2")
-# )
-# 
-# tracks = track_extract(bigWigs = bigWigs, loci = "chr3:187,715,903-187,752,003", binsize = 50, custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+"), nthreads = 6)
-# 
-# trackplot(
-#   bigWigs = bigWigs,
-#   loci = "chr3:187,715,903-187,752,003",
-#   draw_gene_track = TRUE,
-#   build = "hg38",
-#   mark_regions = markregions,
-#   custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
-# )
-# }
-
-# .run_test_profileplot = function(){
-#   #bigWigs = list.files(path = "/Volumes/datadrive/bws/trackR/", pattern = "*\\.bw", full.names = TRUE)
-    #bigWigs = list.files(path = "/bigdisk/Aurore/Epigenomic_landscape_Adult_T-ALL/data/extdata/BLUEPRINT_final_data/H3K27ac/bigWigs/", pattern = "*\\.bw", full.names = TRUE)
-#   #bigWigs = bigWigs[grep(pattern = "^[0-9]", x = basename(bigWigs), invert = TRUE)][1:5]
-#   bigWigs = bigWigs[grep(pattern = "^GSM", x = basename(bigWigs), invert = TRUE)]
-#   bed = "/Volumes/datadrive/bws/trackR/sample.narrowPeak"
-# 
-#   profileplot(bigWigs = bigWigs, bed = bed, genome = "tss")
-# }
-
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

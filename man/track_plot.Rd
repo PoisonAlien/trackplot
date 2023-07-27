@@ -7,29 +7,38 @@
 track_plot(
   summary_list = NULL,
   draw_gene_track = TRUE,
-  query_ucsc = TRUE,
   show_ideogram = FALSE,
-  build = "hg19",
   col = "gray70",
-  groupAutoScale = TRUE,
+  groupAutoScale = FALSE,
   groupScaleByCondition = FALSE,
   y_max = NULL,
   y_min = NULL,
   txname = NULL,
   genename = NULL,
-  gene_track_height = 2,
-  scale_track_height = 1,
-  show_axis = TRUE,
-  gene_fsize = 0.6,
+  show_axis = FALSE,
+  gene_fsize = 1,
   track_names = NULL,
   track_names_pos = 0,
+  track_names_to_left = FALSE,
   regions = NULL,
-  region_width = 1,
   collapse_txs = TRUE,
   boxcol = "#192A561A",
   boxcolalpha = 0.2,
   gene_model = NULL,
-  isGTF = FALSE
+  isGTF = FALSE,
+  chromHMM = NULL,
+  chromHMM_cols = NULL,
+  chromHMM_names = NULL,
+  ucscChromHMM = NULL,
+  peaks = NULL,
+  bw_track_height = 3,
+  peaks_track_height = 2,
+  gene_track_height = 2,
+  scale_track_height = 2,
+  chromHMM_track_height = 1,
+  cytoband_track_height = 2,
+  peaks_track_names = NULL,
+  left_mar = NULL
 )
 }
 \arguments{
@@ -37,13 +46,9 @@ track_plot(
 
 \item{draw_gene_track}{Default FALSE. If TRUE plots gene models overlapping with the queried region}
 
-\item{query_ucsc}{Default FALSE. But switches to TRUE when `gene_model` is not given. Requires `mysql` installation.}
+\item{show_ideogram}{Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when \code{query_ucsc} is TRUE.}
 
-\item{show_ideogram}{Default TRUE. If TRUE plots ideogram of the target chromosome with query loci highlighted. Works only when `query_ucsc` is TRUE.}
-
-\item{build}{Genome build. Default `hg19`}
-
-\item{col}{Color for tracks. Default `#2f3640`. Multiple colors can be provided for each track}
+\item{col}{Color for tracks. Default \verb{#2f3640}. Multiple colors can be provided for each track}
 
 \item{groupAutoScale}{Default TRUE}
 
@@ -57,10 +62,6 @@ track_plot(
 
 \item{genename}{gene name to draw. Default NULL. Plots all genes overlapping with the queried region}
 
-\item{gene_track_height}{Default 2}
-
-\item{scale_track_height}{Default 1}
-
 \item{show_axis}{Default FALSE}
 
 \item{gene_fsize}{Font size. Default 1}
@@ -68,6 +69,8 @@ track_plot(
 \item{track_names}{Default NULL}
 
 \item{track_names_pos}{Default 0 (corresponds to left corner)}
+
+\item{track_names_to_left}{If TRUE, track names are shown to the left of the margin. Default FALSE, plots on top as a title}
 
 \item{regions}{genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.}
 
@@ -79,8 +82,40 @@ track_plot(
 
 \item{gene_model}{File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server}
 
-\item{isGTF}{Default FALSE. Set to TRUE if the `gene_model` is a gtf file.}
+\item{isGTF}{Default FALSE. Set to TRUE if the \code{gene_model} is a gtf file.}
+
+\item{chromHMM}{chromHMM data. Can be path to bed files or a list data.frames with first three columns containing chr,start,end and a 4th column containing integer coded state}
+
+\item{chromHMM_cols}{A named vector for each state (in the 4th column of chromHMM file). Default NULL}
+
+\item{chromHMM_names}{name for the chromHMM track}
+
+\item{ucscChromHMM}{Name of the chromHMM table. Use .get_ucsc_hmm_tbls() to see the details.}
+
+\item{peaks}{bed file to be highlighted. Can be path to bed files or a list data.frames with first three columns containing chr,start,end.}
+
+\item{bw_track_height}{Default 3}
+
+\item{peaks_track_height}{Default 2.}
+
+\item{gene_track_height}{Default 2}
+
+\item{scale_track_height}{Default 1}
+
+\item{chromHMM_track_height}{Default 1}
+
+\item{cytoband_track_height}{Default 1}
+
+\item{peaks_track_names}{Provide a name for each loci bed file. Default NULL}
+
+\item{left_mar}{Space to the left. Default 4}
 }
 \description{
 Generate IGV style locus tracks with ease
+}
+\examples{
+bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
+oct4_loci = "chr6:31125776-31144789"
+t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+trackplot::track_plot(summary_list = t)
 }
