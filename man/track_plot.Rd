@@ -114,7 +114,7 @@ track_plot(
 Generate IGV style locus tracks with ease
 }
 \examples{
-bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
+bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) |> rev()
 oct4_loci = "chr6:31125776-31144789"
 t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
 trackplot::track_plot(summary_list = t)

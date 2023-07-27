@@ -70,7 +70,6 @@ track_extract = function(bigWigs = NULL, bed = NULL, loci = NULL, binsize = 50, 
   
   #Check if inputs are bigWig
   input_bw = ifelse(test = is.null(bed), yes = TRUE, no = FALSE)
-  print(input_bw)
   
   .check_windows()
   if(input_bw){

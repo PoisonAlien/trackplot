@@ -13,7 +13,9 @@ It has three main utilities:
 * `profile_extract()` -> `profile_plot()` - for density based profile plots
 * `extract_signal()` -> `pca_plot()` - PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts.
 
-`trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for dependencies.
+## Installation
+
+`trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for [dependencies](https://github.com/PoisonAlien/trackplot#dependencies).
 
 ```r
 source("https://github.com/PoisonAlien/trackplot/blob/master/R/trackplot.R?raw=true")
@@ -28,15 +30,15 @@ source('trackplot.R')
 remotes::install_github(repo = "poisonalien/trackplot")
 ```
 
-Features:
+## Features
 
-  * It's significantly fast since most of the heavy lifting is done by `bwtool`. Below examples took less than 2 minutes on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
-  * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks, making analysis reproducible.
+  * It's significantly fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool). Below examples took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
+  * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks - making analysis reproducible.
   * Supports GTF and standard UCSC gene formats as well.
   * Lightweight and minimal dependency 
     - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
     - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
-  * Customization: Each plot can customized for color, scale, width, etc.
+  * Customization: Each plot can be customized for color, scale, height, width, etc.
   * Tracks can be summarized per condition (by mean, median, max, min)
 
 ## Usage
@@ -48,7 +50,8 @@ Features:
 ### Step-1: Extract signal from bigWig files 
 ```r
 #Path to bigWig files
-bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
+bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", 
+            "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
 
 #Region to plot
 oct4_loci = "chr6:31125776-31144789"
@@ -59,35 +62,100 @@ t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
 
 
 ### Step-2: Plot
-Basic plot
+
+#### Basic plot
 ```r
-trackplot::track_plot(summary_list = t)
+track_plot(summary_list = t)
 ```
 
-![](https://github.com/PoisonAlien/trackplot/assets/8164062/01a5eb85-ab59-4884-89d6-fc5c46d696fa)
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/b50457b0-6623-47f6-b00f-f6e0de5a4808)
 
-Add cytoband and change colors for each track
+#### Add cytoband and change colors for each track
 ```r
-trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE)
+track_plot(summary_list = t, 
+          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          show_ideogram = TRUE)
 ```
 
-![](https://github.com/PoisonAlien/trackplot/assets/8164062/829ef6e2-9981-4271-9cb8-3f30999ae884)
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/a0911998-aae8-4de1-96f5-18e278d19d80)
 
-Add TF binding sites at the top (any bed files would do)
+#### Add TF binding sites at the top (any bed files would do)
 ```r
-oct4_nanog_peaks = c("H1_Nanog.bed","H1_Oct4.bed")
-trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE, peaks = oct4_nanog_peaks, peaks_track_names = c("NANOG", "OCT4"))
+oct4_nanog_peaks = c("H1_Nanog.bed","H1_Oct4.bed") #Peak files 
+track_plot(summary_list = t, 
+          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          show_ideogram = TRUE, 
+          peaks = oct4_nanog_peaks)
 ```
 
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/2531af5e-7200-478e-aa90-4ff5f537f57a)
 
-Add some chromHMM tracks to the bottom
+#### Add some chromHMM tracks to the bottom
+
+chromHMM data should be a bed file with the 4th column containing chromatin state. See here for an [example](https://github.com/PoisonAlien/trackplot/blob/master/inst/extdata/narrowpeak/H1_chromHMM.bed) file. 
+
+Note that the color code for each of the 15 states are as described [here](https://genome.ucsc.edu/cgi-bin/hgTrackUi?g=wgEncodeBroadHmm&db=hg19). 
+In case if it is different for your data, you will have to define your own color codes for each state and pass it to the argument `chromHMM_cols`
+
 ```r
 chromHMM_peaks = "H1_chromHMM.bed"
 
-trackplot::track_plot(summary_list = t, gene_track_height = 2.5, col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), track_names_to_left = TRUE, left_mar = 4, scale_track_height = 3, genename = c("POU5F1", "TCF19"), gene_fsize = 1.2, show_ideogram = TRUE, peaks = oct4_nanog_peaks, peaks_track_names = c("NANOG", "OCT4"), chromHMM = chromHMM_peaks)
+track_plot(summary_list = t, 
+          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          show_ideogram = TRUE, 
+          peaks = oct4_nanog_peaks, chromHMM = chromHMM_peaks)
 ```
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/5ef8d09f-1bdf-4622-9367-4245bdec63d5)
+
+#### Add some chromHMM tracks from UCSC
+
+UCSC has 9 cell lines for which chromHMM data is available. These can be added automatically in case if you dont have your own data.
+In this case, use the argument `ucscChromHMM` with any values from TableName column of the below table.
+
+```r
+                    TableName    cell                      Description              Tissue Karyotype
+1: wgEncodeBroadHmmGm12878HMM GM12878     B-lymphocyte, lymphoblastoid               blood    normal
+2:  wgEncodeBroadHmmH1hescHMM H1-hESC             embryonic stem cells embryonic stem cell    normal
+3:   wgEncodeBroadHmmHepg2HMM   HepG2         hepatocellular carcinoma               liver    cancer
+4:   wgEncodeBroadHmmHepg2HMM    HMEC         mammary epithelial cells              breast    normal
+5:    wgEncodeBroadHmmHsmmHMM    HSMM        skeletal muscle myoblasts              muscle    normal
+6:   wgEncodeBroadHmmHuvecHMM   HUVEC umbilical vein endothelial cells        blood vessel    normal
+```
+
+```r
+track_plot(summary_list = t, 
+          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          show_ideogram = TRUE, 
+          peaks = oct4_nanog_peaks, 
+          ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/fecf7ab1-44cb-4308-b3f4-d8ca03cdd15d)
+
+
+## narrowPeaks and broadPeaks 
+
+All of the above plots can also be generated with [narroPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
+
+`narrowPeak` is one of the output from macs2 peak caller and are easier to visualize in the absence of bigWig files.
+
+```r
+narrowPeaks = c("H1_Ctcf.bed", "H1_H2az.bed", "H1_k27ac.bed", "H1_k4me1.bed", 
+"H1_k4me3.bed", "H1_Nanog.bed", "H1_Oct4.bed", "H1_Pol2.bed")
+
+oct4_loci = "chr6:30,818,383-31,452,182" #633Kb region for example
+
+#Use the same track_extract but, instead of `bigWigs` use the `bed` argument
+narrowPeaks_track = track_extract(bed = narrowPeaks, loci = oct4_loci, build = "hg19")
+
+#Rest plotting is same
+track_plot(summary_list = narrowPeaks_track, 
+          show_ideogram = TRUE, 
+          peaks = oct4_nanog_peaks, 
+          ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
+
+```
+![image](https://github.com/PoisonAlien/trackplot/assets/8164062/fa3999fd-ab7f-4617-a43e-d3cac7f3a3b3)
 
 
 ## profileplots
@@ -123,7 +191,7 @@ profile_plot(profile_data)
 
 ![](https://user-images.githubusercontent.com/8164062/100755019-05f25c80-33ec-11eb-900e-a9595d443f0f.png)
 
-## PCAplots
+## PCA
 
 `pca_plot()` is a function to perform PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts. Plot data and region summaries returned to the user.
 
