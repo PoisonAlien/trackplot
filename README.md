@@ -43,6 +43,20 @@ remotes::install_github(repo = "poisonalien/trackplot")
 
 ## Usage
 
+```mermaid
+flowchart TD
+    A{read_coldata}
+    A --> B{track_extract}
+    B --> B1[track_plot]
+    A --> C{profile_extract}
+    C --> C1[plot_heatmap]
+    C --> C2[plot_profile]
+    A --> D{extract_summary}
+    D --> D1[pca_plot]
+    D --> D2[diffpeak]
+    D2 --> D3[volcano_plot]
+```
+
 ## trackplots
 
 `track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files. Additionally, `track_summarize` can summarize tracks by condition.
