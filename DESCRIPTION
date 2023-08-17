@@ -1,6 +1,6 @@
 Package: trackplot
 Title: Generate IGV style track plots and profile plots from bigWig files
-Version: 1.4.00
+Version: 1.5.00
 Authors@R: person("Anand", "Mayakonda", , "anandmt3@gmail.com", role = c("aut", "cre"))
 Description: trackplot is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files.
 License: MIT

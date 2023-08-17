@@ -7,27 +7,15 @@
 profile_plot(
   sig_list = NULL,
   color = NULL,
-  condition = NULL,
-  condition_colors = NULL,
-  collapse_replicates = FALSE,
-  plot_se = FALSE,
   line_size = 1,
   legend_fs = 1,
   axis_fs = 1
 )
 }
 \arguments{
-\item{sig_list}{Output generated from profile_extract}
+\item{sig_list}{Output generated from profile_summarize}
 
 \item{color}{Manual colors for each bigWig. Default NULL.}
-
-\item{condition}{Default. Condition associated with each bigWig. Lines will colord accordingly.}
-
-\item{condition_colors}{Manual colors for each level in condition. Default NULL.}
-
-\item{collapse_replicates}{Default FALSE. If TRUE and when \code{condition} is given, collapse signals samples belonging to same condition}
-
-\item{plot_se}{Default FALSE. If TRUE plots standard error shading}
 
 \item{line_size}{Default 1}
 

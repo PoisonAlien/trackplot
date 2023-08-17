@@ -2,39 +2,42 @@
 % Please edit documentation in R/trackplot.R
 \name{profile_extract}
 \alias{profile_extract}
-\title{Generate profile plots with ease}
+\title{Generate bigWig signal matrix for given genomic regions or ucsc refseq transcripts}
 \usage{
 profile_extract(
-  bigWigs = NULL,
+  colData = NULL,
   bed = NULL,
+  ucsc_assembly = TRUE,
+  startFrom = "start",
   binSize = 50,
-  startFrom = "center",
   up = 2500,
   down = 2500,
-  ucsc_assembly = NULL,
-  nthreads = 4,
-  custom_names = NULL
+  pc_genes = TRUE,
+  nthreads = 4
 )
 }
 \arguments{
-\item{bigWigs}{bigWig files. Default NULL. Required.}
-
 \item{bed}{bed file or a data.frame with first 3 column containing chromosome, star, end positions.}
 
-\item{binSize}{bin size to extract signal. Default 50 (bps). Should be >1}
+\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to TRUE will fetch transcripts from UCSC genome browser.}
 
-\item{startFrom}{Default "center". Can be "center", "start" or "end"}
+\item{startFrom}{Default "start". For bed files this can be "start", "center" or "end". For \code{ucsc_assembly} this can only be "start" or "end"}
+
+\item{binSize}{bin size to extract signal. Default 50 (bps). Should be >1}
 
 \item{up}{extend upstream by this many bps from \code{startFrom}. Default 2500}
 
 \item{down}{extend downstream by this many bps from \code{startFrom}. Default 2500}
 
-\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
+\item{pc_genes}{Use only protein coding genes when \code{ucsc_assembly} is used. Default TRUE}
 
 \item{nthreads}{Default 4}
 
-\item{custom_names}{Default NULL and Parses from the file names.}
+\item{coldata}{from \code{read_coldata}}
 }
 \description{
-Generate profile plots with ease
+Generate bigWig signal matrix for given genomic regions or ucsc refseq transcripts
+}
+\seealso{
+\code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{plot_heatmap}}
 }

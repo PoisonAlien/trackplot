@@ -9,7 +9,7 @@ track_summarize(summary_list = NULL, condition = NULL, stat = "mean")
 \arguments{
 \item{summary_list}{Output from track_extract. Required.}
 
-\item{condition}{Default NULL. Provide condition for each bigWig file}
+\item{condition}{a column name in \code{coldata} containing sample conditions. Default NULL.}
 
 \item{stat}{can be \verb{mean, median}, \code{max}, \code{min}. NAs are excluded.}
 }
