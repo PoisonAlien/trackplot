@@ -7,17 +7,21 @@
 track_extract(
   colData = NULL,
   loci = NULL,
+  gene = NULL,
   binsize = 50,
   nthreads = 1,
   query_ucsc = TRUE,
   gtf = NULL,
-  build = "hg38"
+  build = "hg38",
+  padding = 0
 )
 }
 \arguments{
 \item{colData}{coldata from \code{read_coldata}}
 
 \item{loci}{target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003}
+
+\item{gene}{gene name. This is mutually exclusive with \code{loci}}
 
 \item{binsize}{bin size to extract signal. Default 50 (bps).}
 
@@ -29,19 +33,14 @@ track_extract(
 
 \item{build}{Reference genome build. Default hg38}
 
-\item{bigWigs}{bigWig files. Mutually exclusive with colData. Default NULL. Required.}
-
-\item{bed}{narrowPeak or broadPeak files. This argument is mutually exclusive with bigWigs.}
-
-\item{custom_names}{Default NULL and Parses from the file names.}
+\item{padding}{Extend locus on both sides by this many bps.}
 }
 \description{
 Extract bigWig track data for the given loci
 }
 \examples{
 bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
-df = data.frame(bigWigs)
-cd = read_coldata(coldata = df, files_idx = 1)
+cd = read_coldata(bws = bigWigs)
 oct4_loci = "chr6:31125776-31144789"
 t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 }

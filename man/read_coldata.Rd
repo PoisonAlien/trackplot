@@ -6,19 +6,16 @@
 Output from this function is passed to all downstream functions.}
 \usage{
 read_coldata(
-  coldata = NULL,
-  files_idx = NULL,
-  sampleNames_idx = NULL,
+  bws = NULL,
+  sample_names = NULL,
   build = "hg38",
   input_type = "bw"
 )
 }
 \arguments{
-\item{coldata}{a data.frame or a tsv file containing absolute path to bigWig files and other optional associated sample annotations}
+\item{bws}{path to bigWig files}
 
-\item{files_idx}{column index containing path to bigWig (or narrowPeak, broadPeak)files. Required.}
-
-\item{sampleNames_idx}{column index containing sample names for corresponding bigWig files. Optional. Default NULL - creates one from bigWig files.}
+\item{sample_names}{sample names for each input files. Optional. Default NULL - creates one from file names.}
 
 \item{build}{Reference genome build. Default hg38}
 
@@ -30,9 +27,7 @@ Output from this function is passed to all downstream functions.
 }
 \examples{
 bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
-coldf = data.frame(bigWigs)
-cd = read_coldata(coldata = coldf, files_idx = 1)
+cd = read_coldata(bws = bigWigs, build = "hg19")
 beds = system.file("extdata", "narrowpeak", package = "trackplot") |> list.files(pattern = "\\\\.bed$", full.names = TRUE) 
-coldf_bed = data.frame(beds)
-cd_bed = read_coldata(coldata = coldf_bed, files_idx = 1)
+cd_bed = read_coldata(bws = beds, input_type = "peak", build = "hg19")
 }

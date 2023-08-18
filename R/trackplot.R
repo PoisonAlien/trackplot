@@ -11,15 +11,15 @@
 #
 # Change log:
 # Version: 1.5.00 
-#   * Added `read_coldata` to import bigwig and bed files along with metadata. This streamlines all the downstream processes/
-#   * Added `plot_heatmap`
+#   * Added `read_coldata` to import bigwig and bed files along with metadata. This streamlines all the downstream processes
+#   * Added `profile_heatmap` for plotting heatmap
 #   * Added `diffpeak` for minimal differential peak analysis based on peak intensities
 #   * Added `volcano_plot` for diffpeak results visualization
 #   * Added `summarize_homer_annots`
 #   * Support for GTF files with `track_extract`
-#   * More customization to `profile_extract` and `profile_plot`
+#   * `track_extract` now accepts gene name as input.
+#   * More customization to `profile_extract` `profile_plot` and `plot_pca`
 #   * Nicer output with `extract_summary` 
-#   * More customization to `plot_pca` 
 # Version: 1.4.00 [2023-07-27]
 #   * Updated track_plot to include chromHMM tracks and top peaks tracks
 #   * Support to draw narrowPeak or boradPeak files with track_plot
@@ -55,89 +55,82 @@
 
 #'Prepares meta data table from bigWig files.
 #'Output from this function is passed to all downstream functions.
-#' @param coldata a data.frame or a tsv file containing absolute path to bigWig files and other optional associated sample annotations
-#' @param files_idx column index containing path to bigWig (or narrowPeak, broadPeak)files. Required.
-#' @param sampleNames_idx column index containing sample names for corresponding bigWig files. Optional. Default NULL - creates one from bigWig files.
+#' @param bws path to bigWig files
+#' @param sample_names sample names for each input files. Optional. Default NULL - creates one from file names.
 #' @param build Reference genome build. Default hg38
 #' @param input_type Default `bw`. Can be `bw` or `peak`
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
-#' coldf = data.frame(bigWigs)
-#' cd = read_coldata(coldata = coldf, files_idx = 1)
+#' cd = read_coldata(bws = bigWigs, build = "hg19")
 #' beds = system.file("extdata", "narrowpeak", package = "trackplot") |> list.files(pattern = "\\.bed$", full.names = TRUE) 
-#' coldf_bed = data.frame(beds)
-#' cd_bed = read_coldata(coldata = coldf_bed, files_idx = 1)
+#' cd_bed = read_coldata(bws = beds, input_type = "peak", build = "hg19")
 #' @export
 
-read_coldata = function(coldata = NULL, files_idx = NULL, sampleNames_idx = NULL, build = "hg38", input_type = "bw"){
+read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_type = "bw"){
   
-  if(is.null(coldata)){
-    stop("Provide a data.frame or a tsv file with paths to bigWig files and other optional associated sample annotations")
-  }
-  
-  if(is.data.frame(x = coldata)){
-    coldata = data.table::as.data.table(x = coldata)
-  }else if(file.exists(coldata)){
-    coldata = data.table::fread(input = coldata, sep = "\t")
-  }
-  
-  if(is.null(files_idx)){
-    print(colnames(coldata))
-    stop("Provide column index containing paths to bigwig files. See above from columns available in coldata")
-  }else{
-    colnames(coldata)[files_idx] = "bw_files"
-    coldata$bw_files = as.character(coldata$bw_files)
-  }
-  
-  message("Checking for files..")
-  for(i in 1:nrow(coldata)){
-    if(!file.exists(as.character(coldata$bw_files)[i])){
-      stop(paste0(as.character(coldata$bw_files)[i], " does not exist!"))
-    }
-  }
-  
-  if(is.null(sampleNames_idx)){
-    #message("Missing column index for sample names. Creating one from bigWig files for now..")
-    coldata$bw_sample_names = unlist(data.table::tstrsplit(x = basename(coldata$bw_files), split = "\\.", keep = 1))
-  }else{
-    colnames(coldata)[sampleNames_idx] = "bw_sample_names"
-    coldata$bw_sample_names = as.character(coldata$bw_sample_names)
-    if(nrow(coldata[duplicated(bw_sample_names)]) > 0){
-      stop(paste0("Duplicated sample names ", unique(coldata[duplicated(bw_sample_names)][,bw_sample_names])))
-    }
+  if(is.null(bws)){
+    stop("Please provide paths to bigWig files")
   }
   
   input_type = match.arg(arg = input_type, choices = c("bw", "peak"))
   
+  message("Checking for files..")
+  bws = as.character(bws)
+  lapply(bws, function(x){
+    if(!file.exists(x)){
+      stop(paste0(x, " does not exist!"))
+    }
+  })
+  
+  if(is.null(sample_names)){
+    bw_sample_names = unlist(data.table::tstrsplit(x = basename(bws), split = "\\.", keep = 1))
+  }else{
+    bw_sample_names = as.character(sample_names)  
+  }
+  
+  if(any(duplicated(bw_sample_names))){
+    stop("Found duplicates. Samples names must be unique")
+  }
+  if(length(bw_sample_names) != length(bws)){
+    stop("Please provide names for each input file")
+  }
+  
+  coldata = data.table::data.table(bw_files = bws, bw_sample_names = bw_sample_names)
+  
   attr(coldata, "refbuild") = build
-  attr(coldata, "is_bw") = input_type ==  "bw"
+  attr(coldata, "is_bw") =  input_type ==  "bw"
+  message("Input type: ", input_type)
+  message("Ref genome: ", build)
+  message("OK!")
   
   coldata
 }
 
 #' Extract bigWig track data for the given loci
 #' @param colData coldata from \code{read_coldata}
-#' @param bigWigs bigWig files. Mutually exclusive with colData. Default NULL. Required.
-#' @param bed narrowPeak or broadPeak files. This argument is mutually exclusive with bigWigs.
 #' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
+#' @param gene gene name. This is mutually exclusive with \code{loci}
 #' @param binsize bin size to extract signal. Default 50 (bps).
 #' @param nthreads Default 1. Number of threads to use.
-#' @param custom_names Default NULL and Parses from the file names.
 #' @param query_ucsc Default TRUE. Queries UCSC and extracts gene models and cytoband for the loci. Requires `mysql` installation.
 #' @param gtf Use gtf file or data.frame as source for gene model. Default NULL.
 #' @param build Reference genome build. Default hg38
+#' @param padding Extend locus on both sides by this many bps. 
 #' @import data.table
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
-#' df = data.frame(bigWigs)
-#' cd = read_coldata(coldata = df, files_idx = 1)
+#' cd = read_coldata(bws = bigWigs)
 #' oct4_loci = "chr6:31125776-31144789"
 #' t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 #' @export
-track_extract = function(colData = NULL, loci = NULL, binsize = 50, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38"){
+track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 50, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0){
   
   if(is.null(colData)){
     stop("Missing colData. Use read_coldata() to generate one.")
+  }
+  
+  if(all(is.null(loci), is.null(gene))){
+    stop("Please provide a loci or a gene name!")
   }
   
   input_bw = attr(colData, "is_bw")
@@ -153,18 +146,57 @@ track_extract = function(colData = NULL, loci = NULL, binsize = 50, nthreads = 1
   options(warn = -1)
   op_dir = tempdir() #For now
   
-  message("Parsing loci..")
-  if(is.null(loci)){
-    stop("Missing loci. Provide a target region to plot.\n  Should be of format \"chr:start-end\". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003")
+  if(!is.null(gene)){
+    if(!is.null(gtf)){
+      etbl = .parse_gtf(gtf = gtf, genename = gene)
+      cyto = NA
+    }else if(query_ucsc){
+      message("Querying UCSC genome browser for gene model and cytoband..")
+      etbl = .extract_geneModel_ucsc_bySymbol(genesymbol = gene, refBuild = build)
+      chr = unique(as.character(etbl$chr)); start = min(as.numeric(etbl$start)); end = max(as.numeric(etbl$end))
+      if(length(chr) > 1){
+        message("Multiple chromosomes found! Using the first one ", chr[1])
+        etbl = etbl[chr %in% chr[1]]
+        chr = unique(as.character(etbl$chr)); start = min(as.numeric(etbl$start)); end = max(as.numeric(etbl$end))
+      }
+      if(!is.null(etbl)){
+        etbl = .make_exon_tbl(gene_models = etbl)  
+      }
+      cyto = .extract_cytoband(chr = chr, refBuild = build)
+      loci = paste0(chr, ":", start, "-", end)
+    }else{
+      cyto = etbl = NA
+    }
+    if(is.null(etbl)){
+      stop("No transcript models found for ", gene)
+    }
   }else{
+    message("Parsing loci..")
     loci_p = .parse_loci(loci = loci)
     chr = loci_p$chr; start = loci_p$start; end = loci_p$end
+    if(start >= end){
+      stop("End must be larger than Start!")
+    }
+    message("    Queried region: ", chr, ":", start, "-", end, " [", end-start, " bps]")
+    #Extract gene models for this region
+    if(!is.null(gtf)){
+      etbl = .parse_gtf(gtf = gtf, chr = chr, start = start, end = end)
+      cyto = NA
+    }else if(query_ucsc){
+      message("Querying UCSC genome browser for gene model and cytoband..")
+      etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = NULL, genename = NULL)
+      if(!is.null(etbl)){
+        etbl = .make_exon_tbl(gene_models = etbl)  
+      }
+      cyto = .extract_cytoband(chr = chr, refBuild = build)
+    }else{
+      cyto = etbl = NA
+    }
   }
   
-  if(start >= end){
-    stop("End must be larger than Start!")
-  }
-  message("    Queried region: ", chr, ":", start, "-", end, " [", end-start, " bps]")
+  start = start - as.numeric(padding)  
+  end = end + as.numeric(padding)  
+  loci = paste0(chr, ":", start, "-", end)
   
   input_files = colData$bw_files
   custom_names = colData$bw_sample_names
@@ -176,23 +208,10 @@ track_extract = function(colData = NULL, loci = NULL, binsize = 50, nthreads = 1
     track_summary = .get_summaries_narrowPeaks(bigWigs = input_files, nthreads = nthreads, chr, start, end)  
   }
   
-  names(track_summary) = custom_names  
+  names(track_summary) = custom_names
   
-  #Extract gene models for this region
-  if(!is.null(gtf)){
-    etbl = .parse_gtf(gtf = gtf, chr = chr, start = start, end = end)
-    cyto = NA
-  }else if(query_ucsc){
-    message("Querying UCSC genome browser for gene model and cytoband..")
-    etbl = .extract_geneModel_ucsc(chr, start = start, end = end, refBuild = build, txname = NULL, genename = NULL)
-    if(!is.null(etbl)){
-      etbl = .make_exon_tbl(gene_models = etbl)  
-    }
-    cyto = .extract_cytoband(chr = chr, refBuild = build)
-  }else{
-    cyto = etbl = NA
-  }
   attr(track_summary, "meta") = list(etbl = etbl, cyto = cyto, loci = loci)
+  message("OK!")
   
   list(data = track_summary, colData = colData)
 }
@@ -293,8 +312,7 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param left_mar Space to the left. Default 4
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
-#' df = data.frame(bigWigs)
-#' cd = read_coldata(coldata = df, files_idx = 1)
+#' cd = read_coldata(bws = bigWigs, build = "hg19")
 #' oct4_loci = "chr6:31125776-31144789"
 #' t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 #' trackplot::track_plot(summary_list = t)
@@ -474,18 +492,20 @@ track_plot = function(summary_list = NULL,
     
     plot(NA, xlim = c(start, end), ylim = c(0, length(peaks)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
     
-    lapply(seq_along(peaks_data), function(idx){
+    for(idx in seq_along(peaks_data)){
       l_idx = peaks_data[[idx]]
       l_idx = data.table::foverlaps(x = query, y = l_idx, type = "any", nomatch = NULL)[,.(chr, start, end)]
       rect(xleft = start, ybottom = idx - 0.49, xright = end, ytop = idx - 0.51, col = "gray90", border = NA)
-      rect(xleft = l_idx$start, ybottom = idx - 0.9, xright = l_idx$end, ytop = idx - 0.1, col = "#34495e", border = NA)
+      if(nrow(l_idx) > 0){
+        rect(xleft = l_idx$start, ybottom = idx - 0.9, xright = l_idx$end, ytop = idx - 0.1, col = "#34495e", border = NA)
+      }
       text(x = start, y = idx - 0.5, labels = names(peaks_data)[idx], adj = 1.2, xpd = TRUE)
-    })
+    }
   }
   
   #Draw bigWig signals
   if(is_bw){
-    lapply(1:length(summary_list), function(idx){
+    for(idx in 1:length(summary_list)){
       x = summary_list[[idx]]
       if(show_axis){
         par(mar = c(0.5, left_mar, 2, 1))
@@ -494,6 +514,17 @@ track_plot = function(summary_list = NULL,
       }
       
       plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      #If there is no signal, just add the track names and go to next
+      if(nrow(x) == 0){
+        if(track_names_to_left){
+          text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
+          #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
+          #title(main = , adj = track_names_pos, font.main = 3)  
+        }else{
+          title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+        }
+        next
+      }
       rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
       if(show_axis){
         axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
@@ -529,12 +560,11 @@ track_plot = function(summary_list = NULL,
       }else{
         title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)  
       }
-      
-    })
-    
+    }
   }else{
-    lapply(1:length(summary_list), function(idx){
+    for(idx in 1:length(summary_list)){
       x = summary_list[[idx]]
+      
       if(show_axis){
         par(mar = c(0, left_mar, 0, 1))
       }else{
@@ -542,8 +572,19 @@ track_plot = function(summary_list = NULL,
       }
       
       plot(NA, xlim = c(start, end), ylim = c(0, 1), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      #If there is no signal, just add the track names and go to next
+      if(nrow(x) == 0){
+        if(track_names_to_left){
+          text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
+          #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
+          #title(main = , adj = track_names_pos, font.main = 3)  
+        }else{
+          title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+        }
+        next
+      }
       cols = cut(x$max, breaks = c(0, 166, 277, 389, 500, 612, 723, 834, 945, max(x$max)), labels = c("#FFFFFF", "#F0F0F0", "#D9D9D9", "#BDBDBD", "#969696", "#737373", 
-                                                                                               "#525252", "#252525", "#000000"))
+                                                                                                      "#525252", "#252525", "#000000"))
       rect(xleft = x$start, ybottom = 0.01, xright = x$end, ytop = 0.99, col = as.character(cols), border = NA)
       
       if(plot_regions){
@@ -575,8 +616,7 @@ track_plot = function(summary_list = NULL,
       }else{
         title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
       }
-      
-    })
+    }
     
   }
   
@@ -714,7 +754,7 @@ track_plot = function(summary_list = NULL,
 
 # profileplot is an ultra-fast, simple, and minimal dependency R script to generate profile-plots from bigWig files
 #' Generate bigWig signal matrix for given genomic regions or ucsc refseq transcripts 
-#' @param coldata from \code{read_coldata}
+#' @param colData from \code{read_coldata}
 #' @param bed bed file or a data.frame with first 3 column containing chromosome, star, end positions. 
 #' @param binSize bin size to extract signal. Default 50 (bps). Should be >1
 #' @param startFrom Default "start". For bed files this can be "start", "center" or "end". For `ucsc_assembly` this can only be "start" or "end"
@@ -723,7 +763,7 @@ track_plot = function(summary_list = NULL,
 #' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to TRUE will fetch transcripts from UCSC genome browser.
 #' @param pc_genes Use only protein coding genes when `ucsc_assembly` is used. Default TRUE
 #' @param nthreads Default 4
-#' @seealso \code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{plot_heatmap}}
+#' @seealso \code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{profile_heatmap}}
 #' @export
 
 profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, startFrom = "start", binSize = 50,
@@ -746,7 +786,7 @@ profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, sta
       ucsc_assembly = attr(colData, "refbuild")
       message("No bed file was given. Defaulting to ucsc refseq..")
       startFrom = match.arg(arg = startFrom, choices = c("start", "end"))
-      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir, pc_genes = pc_genes)
+      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir, pc_genes = pc_genes, for_profile = TRUE)
       bed_annot = bed[[2]]
       bed = bed[[1]]
     }else{
@@ -754,7 +794,7 @@ profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, sta
     }
   }else{
     startFrom = match.arg(arg = startFrom, choices = c("start", "end", "center"))
-    bed = .make_bed(bed = bed, op_dir = op_dir, up = as.numeric(up), down = as.numeric(up), tss = startFrom)
+    bed = .make_bed(bed = bed, op_dir = op_dir, up = as.numeric(up), down = as.numeric(up), tss = startFrom, for_profile = TRUE)
     bed_annot = NA
   }
   
@@ -868,7 +908,7 @@ profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs 
 #' @param sortBy Sort matrix by.., Can be mean, median. Default mean.
 #' @param col_pal Color palette to use. Default Blues. Use hcl.pals(type = "sequential") to see available palettes
 #' @param revpal Reverse color palette? Default FALSE.
-#' @param sample_bames Manually specify sample names.
+#' @param sample_names Manually specify sample names.
 #' @param title_size size of title. Default 0.8
 #' @param top_profile Boolean. Whether to draw top profile plot.
 #' @param zmins Manually specify min scores to include in heatmap
@@ -878,9 +918,9 @@ profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs 
 #' @param hm_width Width of the plot. Default 1024
 #' @param hm_height Height of the plot. Default 600
 #' @export
-plot_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal = FALSE, sample_names = NULL,
+profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal = FALSE, sample_names = NULL,
                         title_size = 1, top_profile = FALSE, zmins = NULL, zmaxs = NULL,
-                        scale = FALSE, file_name = NULL, hm_width = 1024, hm_height = 600, ...){
+                        scale = FALSE, file_name = NULL, hm_width = 1024, hm_height = 600){
   
   
   if(!sortBy %in% c("mean", "median")){
@@ -1012,7 +1052,6 @@ plot_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal = F
   
 }
 
-
 # bwpcaplot function to perform PCA analysis based on genomic regions of interest or around TSS sites.
 #' Extract area under the curve for every peak from from given bigWig files.
 #' @param colData bigWig files. Default NULL. Required.
@@ -1046,7 +1085,7 @@ extract_summary = function(colData, bed = NULL, ucsc_assembly = TRUE, startFrom 
       ucsc_assembly = attr(colData, "refbuild")
       message("No bed file was given. Defaulting to ucsc refseq..")
       startFrom = match.arg(arg = startFrom, choices = c("start", "end"))
-      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir, pc_genes = pc_genes)
+      bed = .make_genome_bed(refBuild = ucsc_assembly, up = as.numeric(up), down = as.numeric(down), tss = startFrom, op_dir = op_dir, pc_genes = pc_genes, for_profile = FALSE)
       bed_annot = bed[[2]]
       bed = bed[[1]]
     }else{
@@ -1750,6 +1789,24 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)[,.(chr, start, end, name)]
 }
 
+.extract_geneModel_ucsc_bySymbol = function(genesymbol, refBuild){
+  .check_mysql()
+  op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
+  
+  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
+  message(paste0("Extracting gene models from UCSC:\n", "    Gene: ", genesymbol, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  
+  ucsc = data.table::fread(cmd = cmd, sep = "\t")
+  if(nrow(ucsc) == 0){
+    message("No features found within the requested loci!")
+    return(NULL)
+  }
+  
+  colnames(ucsc) = c("chr", "start", "end", "strand", "name", "name2", "exonStarts", "exonEnds")
+  data.table::setkey(x = ucsc, chr, start, end)
+  ucsc
+}
+
 .extract_geneModel_ucsc = function(chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
   .check_mysql()
   op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
@@ -1781,7 +1838,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   gene_models = data.table::foverlaps(x = query, y = ucsc, type = "any", nomatch = NULL)
   
   if(nrow(gene_models) == 0){
-    message("No features found within the requested loci! If you are not sure why..\n    1.Make sure there are no discripancies in chromosome names i.e, chr prefixes\n")
+    message("No features found within the requested loci!")
     return(NULL) 
   }else{
     return(gene_models)
@@ -1891,15 +1948,23 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   gtf[,end := as.numeric(as.character(end))]
   data.table::setkey(x = gtf, chr, start, end)
   
-  query = data.table::data.table(chr, start, end)
-  data.table::setkey(x = query, chr, start, end)
-  
-  gene_models = data.table::foverlaps(x = query, y = gtf, type = "any", nomatch = NULL)
-  
-  if(nrow(gene_models) == 0){
-    message("No features found within the requested loci! If you are not sure why..\n    1.Make sure there are no discripancies in chromosome names i.e, chr prefixes\n")
-    return(NULL)  
+  if(!is.null(genename)){
+    gene_models = gtf[info %like% genename]
+    if(nrow(gene_models) == 0){
+      message("No features found for the gene ", genename)
+      return(NULL)  
+    }
+  }else{
+    query = data.table::data.table(chr, start, end)
+    data.table::setkey(x = query, chr, start, end)
+    gene_models = data.table::foverlaps(x = query, y = gtf, type = "any", nomatch = NULL)
+    if(nrow(gene_models) == 0){
+      message("No features found within the requested loci!")
+      return(NULL)  
+    }
   }
+  
+  
   gene_models_exon = gene_models[feature %in% c("exon", "transcript")]
   #gene_models_rest = gene_models[!feature %in% "exon"]
   
@@ -1956,7 +2021,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   exon_tbls
 }
 
-.make_genome_bed = function(refBuild = "hg19", tss = "start", up = 2500, down = 2500, op_dir = tempdir(), pc_genes = FALSE){
+.make_genome_bed = function(refBuild = "hg19", tss = "start", up = 2500, down = 2500, op_dir = tempdir(), pc_genes = FALSE, for_profile = TRUE){
   if(!dir.exists(paths = op_dir)){
     dir.create(path = op_dir, showWarnings = FALSE, recursive = TRUE)
   }
@@ -1980,23 +2045,43 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   message("Fetched ", nrow(ucsc), " transcripts from ", nrow(ucsc[,.N,.(chr)]), " contigs")
   
-  if(tss == "end"){
-    colnames(ucsc)[2:3] = c("end", "start")
+  if(for_profile){
+    #If it is only for profile plot where tss or tes are extended, we donyt extend manually here. Instead invert tss for negative strand txs. Let bwtool do the hard work
+    ucsc_minus = ucsc[strand %in% "-"]
+    colnames(ucsc_minus) = c("chr", "end", "start", "strand", "tx_id", "gene_id")
+    ucsc_plus = ucsc[strand %in% "+"]
+    ucsc_bed = data.table::rbindlist(l = list(ucsc_plus, ucsc_minus), use.names = TRUE, fill = TRUE)[,.(chr, start, end, tx_id, gene_id)]
+  }else{
+    #If for summary, extrend the regions
+    ucsc_minus = ucsc[strand %in% "-"]
+    if(nrow(ucsc_minus) > 0){
+      if(tss == "start"){
+        ucsc_minus[, bed_start := end-up]
+        ucsc_minus[, bed_end := end+down]
+      }else{
+        ucsc_minus[, bed_start := start-up]
+        ucsc_minus[, bed_end := start+down]
+      }
+    }
+    
+    ucsc_plus = ucsc[strand %in% "+"]
+    if(nrow(ucsc_plus) > 0){
+      if(tss == "start"){
+        ucsc_plus[, bed_start := start-up]
+        ucsc_plus[, bed_end := start+down]
+      }else{
+        ucsc_plus[, bed_start := end-up]
+        ucsc_plus[, bed_end := end+down]
+      }
+    }
+    
+    ucsc_bed = data.table::rbindlist(
+      l = list(ucsc_plus[, .(chr, bed_start, bed_end, tx_id, gene_id)], ucsc_minus[, .(chr, bed_start, bed_end, tx_id, gene_id)]),
+      use.names = TRUE,
+      fill = TRUE
+    )
   }
   
-  ucsc_minus = ucsc[strand %in% "-"]
-  if(nrow(ucsc_minus) > 0){
-    ucsc_minus[, bed_start := end-up]
-    ucsc_minus[, bed_end := end+down]
-  }
-  
-  ucsc_plus = ucsc[strand %in% "+"]
-  if(nrow(ucsc_plus) > 0){
-    ucsc_plus[, bed_start := start-up]
-    ucsc_plus[, bed_end := start+down]
-  }
-  
-  ucsc_bed = data.table::rbindlist(l = list(ucsc_plus[, .(chr, bed_start, bed_end, tx_id, gene_id)], ucsc_minus[, .(chr, bed_start, bed_end, tx_id, gene_id)]), use.names = TRUE, fill = TRUE)
   colnames(ucsc_bed) = c("chr", "start", "end", "tx", "gene")
   data.table::setkey(x = ucsc_bed, chr, start, end)
   
@@ -2006,7 +2091,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   list(temp_op_bed, paste0(temp_op_bed, "2"))
 }
 
-.make_bed = function(bed, op_dir = tempdir(), up = 2500, down = 2500, tss = "center"){
+.make_bed = function(bed, op_dir = tempdir(), up = 2500, down = 2500, tss = "center", for_profile = FALSE){
   #bwtool tool requires only three columns
   
   tss = match.arg(arg = tss, choices = c("start", "end", "center"))
@@ -2026,21 +2111,24 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     bed[, end := as.numeric(as.character(end))]
   }else if(file.exists(bed)){
     bed = data.table::fread(file = bed, select = list(character = 1, numeric = c(2, 3)), col.names = c("chr", "start", "end"))
+    bed = bed[,.(chr, start, end)]
   }
   
-  if(tss == "center"){
-    bed[, focal_point := as.integer(apply(bed[,2:3], 1, mean))]
-    bed[, bed_start := focal_point-up]
-    bed[, bed_end := focal_point+down]
-  }else if(tss == "start"){
-    bed[, bed_start := start-up]
-    bed[, bed_end := start+down]
-  }else{
-    bed[, bed_start := end-up]
-    bed[, bed_end := end+down]
+  if(!for_profile){
+    if(tss == "center"){
+      bed[, focal_point := as.integer(apply(bed[,2:3], 1, mean))]
+      bed[, bed_start := focal_point-up]
+      bed[, bed_end := focal_point+down]
+    }else if(tss == "start"){
+      bed[, bed_start := start-up]
+      bed[, bed_end := start+down]
+    }else{
+      bed[, bed_start := end-up]
+      bed[, bed_end := end+down]
+    }
+    bed = bed[,.(chr, bed_start, bed_end)]
+    data.table::setkey(x = bed, chr, bed_start, bed_end)
   }
-  bed = bed[,.(chr, bed_start, bed_end)]
-  data.table::setkey(x = bed, chr, bed_start, bed_end)
   
   data.table::fwrite(x = bed, file = temp_op_bed, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
   
@@ -2055,7 +2143,15 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   bw = gsub(pattern = " ", replacement = "\\ ", x = bw, fixed = TRUE) #Change spaces with \ for unix style paths
   
-  cmd = paste0("bwtool matrix -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+  if(startFrom == "start"){
+    cmd = paste0("bwtool matrix -starts -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))  
+  }else if(startFrom == "end"){
+    cmd = paste0("bwtool matrix -ends -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+  }else{
+    cmd = paste0("bwtool matrix -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+  }
+  print(cmd)
+
   system(command = cmd, intern = TRUE)
   paste0(op_dir, "/", bn, ".matrix")
 }

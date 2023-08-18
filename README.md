@@ -45,12 +45,13 @@ remotes::install_github(repo = "poisonalien/trackplot")
 
 ```mermaid
 flowchart TD
-    a[bigWig files]-->A{read_coldata}
+    a[bigWig file list] -->A{read_coldata}
     A --> B{track_extract}
     B --> B1[track_plot]
     A --> C{profile_extract}
-    C --> C1[plot_heatmap]
-    C --> C2[plot_profile]
+    C --> C1[profile_summarize]
+    C --> C3[profile_heatmap]
+    C1 --> C2[profile_plot]
     A --> D{extract_summary}
     D --> D1[pca_plot]
     D --> D2[diffpeak]

@@ -17,6 +17,8 @@ profile_extract(
 )
 }
 \arguments{
+\item{colData}{from \code{read_coldata}}
+
 \item{bed}{bed file or a data.frame with first 3 column containing chromosome, star, end positions.}
 
 \item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to TRUE will fetch transcripts from UCSC genome browser.}
@@ -32,12 +34,10 @@ profile_extract(
 \item{pc_genes}{Use only protein coding genes when \code{ucsc_assembly} is used. Default TRUE}
 
 \item{nthreads}{Default 4}
-
-\item{coldata}{from \code{read_coldata}}
 }
 \description{
 Generate bigWig signal matrix for given genomic regions or ucsc refseq transcripts
 }
 \seealso{
-\code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{plot_heatmap}}
+\code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{profile_heatmap}}
 }
