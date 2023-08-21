@@ -110,7 +110,7 @@ read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_t
 #' @param colData coldata from \code{read_coldata}
 #' @param loci target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003
 #' @param gene gene name. This is mutually exclusive with \code{loci}
-#' @param binsize bin size to extract signal. Default 50 (bps).
+#' @param binsize bin size to extract signal. Default 10 (bps).
 #' @param nthreads Default 1. Number of threads to use.
 #' @param query_ucsc Default TRUE. Queries UCSC and extracts gene models and cytoband for the loci. Requires `mysql` installation.
 #' @param gtf Use gtf file or data.frame as source for gene model. Default NULL.
@@ -123,7 +123,7 @@ read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_t
 #' oct4_loci = "chr6:31125776-31144789"
 #' t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 #' @export
-track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 50, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0){
+track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0){
   
   if(is.null(colData)){
     stop("Missing colData. Use read_coldata() to generate one.")
@@ -285,7 +285,6 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param genename gene name to draw. Default NULL. Plots all genes overlapping with the queried region
 #' @param collapse_txs Default FALSE. Whether to collapse all transcripts belonging to same gene into a unified gene model
 #' @param groupAutoScale Default TRUE
-#' @param groupScaleByCondition Scale tracks by condition
 #' @param y_max custom y axis upper limits for each track. Recycled if required.
 #' @param y_min custom y axis lower limits for each track. Recycled if required.
 #' @param gene_fsize Font size. Default 1
@@ -322,7 +321,6 @@ track_plot = function(summary_list = NULL,
                       show_ideogram = TRUE,
                       col = "gray70",
                       groupAutoScale = FALSE,
-                      groupScaleByCondition = FALSE,
                       y_max = NULL,
                       y_min = NULL,
                       txname = NULL,
@@ -403,6 +401,7 @@ track_plot = function(summary_list = NULL,
     names(summary_list) = track_names
   }
   
+  groupScaleByCondition = FALSE #For furture
   if(groupScaleByCondition){
     plot_height = unlist(lapply(summary_list, function(x) max(x$max, na.rm = TRUE)))
     plot_height_min = unlist(lapply(summary_list, function(x) min(x$max, na.rm = TRUE)))
@@ -644,6 +643,8 @@ track_plot = function(summary_list = NULL,
     
     if(is.null(chromHMM_names)){
       names(hmmdata) = paste0("chromHMM_", 1:length(hmmdata))
+    }else{
+      names(hmmdata) = chromHMM_names
     }
     
     plotHMM = TRUE
@@ -825,6 +826,8 @@ profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, sta
 #' @param sig_list Output generated from `profile_extract`
 #' @param stat Default `mean`. Can be `mean`, `median`
 #' @param condition column name with conditions in `colData`. If provided summarizes signals from samples belonging to same group or condition
+#' @seealso \code{\link{profile_extract}} \code{\link{profile_plot}} \code{\link{profile_heatmap}}
+#' @export
 profile_summarize = function(sig_list = NULL, stat = "mean", condition = NULL){
   
   if(is.null(sig_list)){

@@ -10,7 +10,6 @@ track_plot(
   show_ideogram = TRUE,
   col = "gray70",
   groupAutoScale = FALSE,
-  groupScaleByCondition = FALSE,
   y_max = NULL,
   y_min = NULL,
   txname = NULL,
@@ -49,8 +48,6 @@ track_plot(
 \item{col}{Color for tracks. Default \verb{#2f3640}. Multiple colors can be provided for each track}
 
 \item{groupAutoScale}{Default TRUE}
-
-\item{groupScaleByCondition}{Scale tracks by condition}
 
 \item{y_max}{custom y axis upper limits for each track. Recycled if required.}
 

@@ -16,3 +16,6 @@ profile_summarize(sig_list = NULL, stat = "mean", condition = NULL)
 \description{
 Summarize data for profile plots
 }
+\seealso{
+\code{\link{profile_extract}} \code{\link{profile_plot}} \code{\link{profile_heatmap}}
+}

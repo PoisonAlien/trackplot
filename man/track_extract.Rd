@@ -8,7 +8,7 @@ track_extract(
   colData = NULL,
   loci = NULL,
   gene = NULL,
-  binsize = 50,
+  binsize = 10,
   nthreads = 1,
   query_ucsc = TRUE,
   gtf = NULL,
@@ -23,7 +23,7 @@ track_extract(
 
 \item{gene}{gene name. This is mutually exclusive with \code{loci}}
 
-\item{binsize}{bin size to extract signal. Default 50 (bps).}
+\item{binsize}{bin size to extract signal. Default 10 (bps).}
 
 \item{nthreads}{Default 1. Number of threads to use.}
 

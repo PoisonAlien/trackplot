@@ -9,3 +9,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Depends: data.table
 Imports: methods
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
