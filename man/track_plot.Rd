@@ -7,10 +7,9 @@
 track_plot(
   summary_list = NULL,
   draw_gene_track = TRUE,
-  show_ideogram = FALSE,
+  show_ideogram = TRUE,
   col = "gray70",
   groupAutoScale = FALSE,
-  groupScaleByCondition = FALSE,
   y_max = NULL,
   y_min = NULL,
   txname = NULL,
@@ -24,8 +23,6 @@ track_plot(
   collapse_txs = TRUE,
   boxcol = "#192A561A",
   boxcolalpha = 0.2,
-  gene_model = NULL,
-  isGTF = FALSE,
   chromHMM = NULL,
   chromHMM_cols = NULL,
   chromHMM_names = NULL,
@@ -52,8 +49,6 @@ track_plot(
 
 \item{groupAutoScale}{Default TRUE}
 
-\item{groupScaleByCondition}{Scale tracks by condition}
-
 \item{y_max}{custom y axis upper limits for each track. Recycled if required.}
 
 \item{y_min}{custom y axis lower limits for each track. Recycled if required.}
@@ -79,10 +74,6 @@ track_plot(
 \item{boxcol}{color for highlighted region. Default "#192A561A"}
 
 \item{boxcolalpha}{Default 0.5}
-
-\item{gene_model}{File with gene models. Can be a gtf file or UCSC file format. If you have read them into R as a data.frame, that works as well. Default NULL, automatically fetches gene models from UCSC server}
-
-\item{isGTF}{Default FALSE. Set to TRUE if the \code{gene_model} is a gtf file.}
 
 \item{chromHMM}{chromHMM data. Can be path to bed files or a list data.frames with first three columns containing chr,start,end and a 4th column containing integer coded state}
 
@@ -114,8 +105,9 @@ track_plot(
 Generate IGV style locus tracks with ease
 }
 \examples{
-bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) |> rev()
+bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
+cd = read_coldata(bws = bigWigs, build = "hg19")
 oct4_loci = "chr6:31125776-31144789"
-t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 trackplot::track_plot(summary_list = t)
 }

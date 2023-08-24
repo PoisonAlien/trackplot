@@ -5,38 +5,42 @@
 \title{Extract bigWig track data for the given loci}
 \usage{
 track_extract(
-  bigWigs = NULL,
-  bed = NULL,
+  colData = NULL,
   loci = NULL,
-  binsize = 50,
-  custom_names = NULL,
+  gene = NULL,
+  binsize = 10,
   nthreads = 1,
   query_ucsc = TRUE,
-  build = "hg38"
+  gtf = NULL,
+  build = "hg38",
+  padding = 0
 )
 }
 \arguments{
-\item{bigWigs}{bigWig files. Default NULL. Required.}
-
-\item{bed}{narrowPeak or broadPeak files. This argument is mutually exclusive with bigWigs.}
+\item{colData}{coldata from \code{read_coldata}}
 
 \item{loci}{target region to plot. Should be of format "chr:start-end". e.g; chr3:187715903-187752003 OR chr3:187,715,903-187,752,003}
 
-\item{binsize}{bin size to extract signal. Default 50 (bps).}
+\item{gene}{gene name. This is mutually exclusive with \code{loci}}
 
-\item{custom_names}{Default NULL and Parses from the file names.}
+\item{binsize}{bin size to extract signal. Default 10 (bps).}
 
 \item{nthreads}{Default 1. Number of threads to use.}
 
 \item{query_ucsc}{Default TRUE. Queries UCSC and extracts gene models and cytoband for the loci. Requires \code{mysql} installation.}
 
+\item{gtf}{Use gtf file or data.frame as source for gene model. Default NULL.}
+
 \item{build}{Reference genome build. Default hg38}
+
+\item{padding}{Extend locus on both sides by this many bps.}
 }
 \description{
 Extract bigWig track data for the given loci
 }
 \examples{
 bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
+cd = read_coldata(bws = bigWigs)
 oct4_loci = "chr6:31125776-31144789"
-t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 }

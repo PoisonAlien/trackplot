@@ -5,35 +5,35 @@
 \title{Extract area under the curve for every peak from from given bigWig files.}
 \usage{
 extract_summary(
-  bigWigs = NULL,
+  colData,
   bed = NULL,
+  ucsc_assembly = TRUE,
+  startFrom = "start",
   binSize = 50,
-  nthreads = 4,
-  ucsc_assembly = NULL,
-  ucsc_startFrom = "start",
-  ucsc_up = 2500,
-  ucsc_down = 2500,
-  custom_names = NULL
+  up = 2500,
+  down = 2500,
+  pc_genes = TRUE,
+  nthreads = 4
 )
 }
 \arguments{
-\item{bigWigs}{bigWig files. Default NULL. Required.}
+\item{colData}{bigWig files. Default NULL. Required.}
 
 \item{bed}{bed file or a data.frame with first 3 column containing chromosome, star, end positions.}
 
+\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to TRUE will fetch transcripts from UCSC genome browser.}
+
+\item{startFrom}{Default "start". For bed files this can be "start", "center" or "end". For \code{ucsc_assembly} this can only be "start" or "end"}
+
 \item{binSize}{bin size to extract signal. Default 50 (bps). Should be >1}
 
+\item{up}{extend upstream by this many bps from \code{startFrom}. Default 2500}
+
+\item{down}{extend downstream by this many bps from \code{startFrom}. Default 2500}
+
+\item{pc_genes}{Use only protein coding genes when using \code{ucsc_assembly}. Default TRUE}
+
 \item{nthreads}{Default 4}
-
-\item{ucsc_assembly}{If \code{bed} file not provided, setting \code{ucsc_assembly} to ref genome build will fetch transcripts from UCSC genome browser. e.g; 'hg19'}
-
-\item{ucsc_startFrom}{Default "center". Can be "center", "start" or "end"}
-
-\item{ucsc_up}{extend upstream by this many bps from \code{startFrom}. Default 2500}
-
-\item{ucsc_down}{extend downstream by this many bps from \code{startFrom}. Default 2500}
-
-\item{custom_names}{Default NULL and Parses from the file names.}
 }
 \description{
 Extract area under the curve for every peak from from given bigWig files.

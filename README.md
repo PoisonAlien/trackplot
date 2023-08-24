@@ -6,12 +6,7 @@
 
 ## Introduction
 
-`trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots) and profile plots from bigWig files. 
-It has three main utilities:
-
-* `track_extract()` -> `track_plot()` - for IGV style track plots
-* `profile_extract()` -> `profile_plot()` - for density based profile plots
-* `extract_signal()` -> `pca_plot()` - PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts.
+`trackplot.R` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots), profile plots and heatmaps from bigWig files. 
 
 ## Installation
 
@@ -32,16 +27,45 @@ remotes::install_github(repo = "poisonalien/trackplot")
 
 ## Features
 
-  * It's significantly fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool). Below examples took less than a minute on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB) 
+Why `trackplot`?
+
+  * It's extremely fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool).  >15X faster than [deeptools](https://deeptools.readthedocs.io/en/develop/) for equivalent `profileplots` and `heatmaps` 
+  * Lightweight and minimal dependency 
+    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. Similar R packages [GViz](https://bioconductor.org/packages/release/bioc/html/Gviz.html) and [karyoploteR](http://bioconductor.org/packages/release/bioc/html/karyoploteR.html) has over 150 dependencies.
+    - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
   * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks - making analysis reproducible.
   * Supports GTF and standard UCSC gene formats as well.
-  * Lightweight and minimal dependency 
-    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
-    - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
   * Customization: Each plot can be customized for color, scale, height, width, etc.
   * Tracks can be summarized per condition (by mean, median, max, min)
+  * PCA and, optional differential peak analysis with `limma` when using uniformly processed, normalized bigWig files.
 
 ## Usage
+
+Simple usage - Make a table of all the bigWig files to be analysed with `read_coldata()` and pass it to the downstream functions.
+
+```mermaid
+flowchart TD
+    a[bigWig file list] -->A{read_coldata}
+    A --> B{track_extract}
+    B --> B1[track_plot]
+    A --> C{profile_extract}
+    C --> C1[profile_summarize]
+    C --> C3[profile_heatmap]
+    C1 --> C2[profile_plot]
+    A --> D{extract_summary}
+    D --> D1[pca_plot]
+    D --> D2[diffpeak]
+    D2 --> D3[volcano_plot]
+```
+
+```r
+#Path to bigWig files
+bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", 
+            "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
+
+#Make a table of bigWigs along with ref genome build
+bigWigs = read_coldata(bws = bigWigs, build = "hg19")
+```
 
 ## trackplots
 
@@ -49,15 +73,15 @@ remotes::install_github(repo = "poisonalien/trackplot")
  
 ### Step-1: Extract signal from bigWig files 
 ```r
-#Path to bigWig files
-bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", 
-            "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
-
 #Region to plot
 oct4_loci = "chr6:31125776-31144789"
 
-#Extract bigWig signal
-t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+#Extract bigWig signal for a loci of interest
+t = track_extract(colData = bigWigs, loci = oct4_loci)
+
+#Or you can also specifiy a gene name instead of a loci 
+# - loci and gene models will be automatically extracted from UCSC genome browser
+t = track_extract(colData = bigWigs, gene = "POUF51")
 ```
 
 
@@ -72,18 +96,20 @@ track_plot(summary_list = t)
 
 #### Add cytoband and change colors for each track
 ```r
+track_cols = c("#d35400","#d35400","#2980b9","#2980b9","#2980b9", "#27ae60","#27ae60")
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE)
 ```
 
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/a0911998-aae8-4de1-96f5-18e278d19d80)
 
-#### Add TF binding sites at the top (any bed files would do)
+#### Heighilight regions of interest (any bed files would do)
+
 ```r
 oct4_nanog_peaks = c("H1_Nanog.bed","H1_Oct4.bed") #Peak files 
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks)
 ```
@@ -101,7 +127,7 @@ In case if it is different for your data, you will have to define your own color
 chromHMM_peaks = "H1_chromHMM.bed"
 
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks, chromHMM = chromHMM_peaks)
 ```
@@ -124,7 +150,7 @@ In this case, use the argument `ucscChromHMM` with any values from TableName col
 
 ```r
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks, 
           ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
@@ -135,18 +161,21 @@ track_plot(summary_list = t,
 
 ## narrowPeaks and broadPeaks 
 
-All of the above plots can also be generated with [narroPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
+All of the above plots can also be generated with [narrowPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
 
 `narrowPeak` is one of the output from macs2 peak caller and are easier to visualize in the absence of bigWig files.
 
 ```r
-narrowPeaks = c("H1_Ctcf.bed", "H1_H2az.bed", "H1_k27ac.bed", "H1_k4me1.bed", 
-"H1_k4me3.bed", "H1_Nanog.bed", "H1_Oct4.bed", "H1_Pol2.bed")
+narrowPeaks = c("H1_Ctcf.bed", "H1_H2az.bed", "H1_k27ac.bed", 
+                "H1_k4me1.bed", "H1_k4me3.bed", "H1_Nanog.bed", 
+                "H1_Oct4.bed", "H1_Pol2.bed")
+
+#Use peak as input_type
+narrowPeaks = read_coldata(narrowPeaks, build = "hg19", input_type = "peak")
 
 oct4_loci = "chr6:30,818,383-31,452,182" #633Kb region for example
 
-#Use the same track_extract but, instead of `bigWigs` use the `bed` argument
-narrowPeaks_track = track_extract(bed = narrowPeaks, loci = oct4_loci, build = "hg19")
+narrowPeaks_track = track_extract(colData = narrowPeaks, loci = oct4_loci)
 
 #Rest plotting is same
 track_plot(summary_list = narrowPeaks_track, 
@@ -155,68 +184,77 @@ track_plot(summary_list = narrowPeaks_track,
           ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
 
 ```
+  
 ![image](https://github.com/PoisonAlien/trackplot/assets/8164062/fa3999fd-ab7f-4617-a43e-d3cac7f3a3b3)
 
 
 ## profileplots
 
-`profile_extract()` and `profile_plot()` are functions to generate density based profile-plots from bigWig files.
+`profile_extract()` -> `profile_summarize()` -> `profile_plot()` are functions to generate density based profile-plots from bigWig files.
 
-  * Below example for summarizing approx. 33,250 peaks for 5 bigWig files takes around 90 seconds on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB). This includes generating signal matrix, summarizing, and plotting
-  * Optionally, it can even query UCSC genome browser for refseq transcripts of desired assembly and summarize around TSS regions
+
+  * Below example for summarizing approx. 3,671 peaks for 3 bigWig files takes ca. 3 seconds on my 5 year old [macbook Pro](https://support.apple.com/kb/sp715?locale=en_GB). This includes generating signal matrix, summarizing, and plotting. Equivalent deeptools commands takes 20 seconds.
+  * Optionally, it can also query UCSC genome browser for refseq transcripts of desired assembly and summarize around TSS regions
   * Replicates can be collapsed into single value per condition
 
-```r
-#Example profile plot for a bed file with ~33,250 peaks, centered and extended 2500 bps
-profile_data = profile_extract(
-  bigWigs = bigWigs,
-  bed = "CD34.bed",
-  startFrom = "center",
-  up = 2500,
-  down = 2500
-)
-
-profile_plot(profile_data)
-
-#profile plot for refseq protein-coding genes (TSS +/2500)
-profile_data = profile_extract(
-  bigWigs = bigWigs,
-  ucsc_assembly = "hg38",
-  startFrom = "tss",
-  up = 2500,
-  down = 2500
-)
-profile_plot(profile_data)
-```
-
-![](https://user-images.githubusercontent.com/8164062/100755019-05f25c80-33ec-11eb-900e-a9595d443f0f.png)
-
-## PCA
-
-`pca_plot()` is a function to perform PCA analysis based on genomic regions of interest or around TSS sites of reference transcripts. Plot data and region summaries returned to the user.
+Example data from [GSE99183](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE99183) where U87 glioma cell lines are treated with a DMSO and a BRD4 degradaer.
 
 ```r
-#PCA using UCSC protein coding reference transcripts (TSS+/- 2500 bp)
-refseq_summary = extract_summary(
-  bigWigs = bigWigs,
-  ucsc_assembly = "hg38"
-)
-
-pca_plot(summary_list = refseq_summary)
-
-#PCA using genomic regions of interest (BED file)
-bed_summary = extract_summary(
-  bigWigs = bigWigs,
-  bed = "sample.bed",
-  custom_names = c("CD34", "EC", "LC", "CD4+", "CD8+")
-)
-
-pca_plot(summary_list = bed_summary)
+bws = c("GSM2634756_U87_BRD4.bw", "GSM2634757_U87_BRD4_dBET_24h.bw", "GSM2634758_U87_BRD4_dBET_2h.bw")
+bws = read_coldata(bws = bws, 
+                  sample_names = c("BRD4", "BRD4_dBET_24h", "BRD4_dBET_2h"), 
+                  build = "hg19")
 ```
 
-![](https://user-images.githubusercontent.com/8164062/101655218-a62a3000-3a41-11eb-8d20-38d046d6f042.png)
+### Refseq transcripts
 
-### Dependencies
+```r
+#Extract signals from bigWig files around refseq transcripts
+pe_refseq = profile_extract(colData = bws, ucsc_assembly = TRUE, 
+                            startFrom = 'start', up = 1500, down = 1500)
+
+#Estimate mean signal
+ps_refseq = profile_summarize(sig_list = pe_refseq) 
+
+#Plot
+profile_plot(ps_refseq)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/bd26cdac-6f87-44ed-b41c-685454c6d28c)
+
+
+### Custom BED regions
+
+```r
+#BRD4 binding sites 
+bed = "GSM2634756_U87_BRD4_peaks.narrowPeak.gz"
+
+#Center and extend 1500 both ways from the peak center
+pe_bed = profile_extract(colData = bws, bed = bed, startFrom = "center", 
+                          up = 1500, down = 1500, nthreads = 4)
+
+#Estimate mean signal
+ps_bed = profile_summarize(sig_list = pe_bed) 
+
+#Plot
+profile_plot(ps_bed)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/94c1d728-e38c-418a-8469-ba50c42dc295)
+
+
+## heatmap
+
+Output from `profile_extract` can be used to draw a heatmap with `profile_heatmap`
+
+```r
+profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/a82eedc8-a3f3-4439-a005-13242fce7929)
+
+
+## Dependencies
 
 * [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
 * [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). 
