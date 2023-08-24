@@ -2416,7 +2416,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   x = (1:(length(y)))/length(y)
   par(mar = c(1,2,1,1))
   plot(NA, axes = FALSE, xlim = c(-0.2, 1), ylim = ylims, xlab = NA, ylab = NA)
-  grid(col = "gray90")
+  #grid(col = "gray90")
   points(x, y, type = "l", lwd = 1.2)
   axis(side = 2, at = ylims, lwd = 1, line = -0.6, labels = NA)
   mtext(side = 2, at = ylims, lwd = 1, line = -0.05, text = ylims, cex = 0.8, font = 1, las = 2)

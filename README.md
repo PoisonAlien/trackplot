@@ -27,21 +27,21 @@ remotes::install_github(repo = "poisonalien/trackplot")
 
 ## Features
 
-Why should I use this when there are several tools out there?
+Why `trackplot`?
 
-  * It's extremely fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool). Up to 10X faster than deeptools for equivalent `profileplots` and `heatmaps` 
+  * It's extremely fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool).  >15X faster than [deeptools](https://deeptools.readthedocs.io/en/develop/) for equivalent `profileplots` and `heatmaps` 
   * Lightweight and minimal dependency 
-    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
+    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. Similar R packages [GViz](https://bioconductor.org/packages/release/bioc/html/Gviz.html) and [karyoploteR](http://bioconductor.org/packages/release/bioc/html/karyoploteR.html) has over 150 dependencies.
     - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
   * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks - making analysis reproducible.
   * Supports GTF and standard UCSC gene formats as well.
   * Customization: Each plot can be customized for color, scale, height, width, etc.
   * Tracks can be summarized per condition (by mean, median, max, min)
-  * PCA and, optional differential peak analysis with `limma` 
+  * PCA and, optional differential peak analysis with `limma` when using uniformly processed, normalized bigWig files.
 
 ## Usage
 
-Simple usage - Make a table of all the bigWig files to analysed with `read_coldata()` and pass it to all the downstream functions.
+Simple usage - Make a table of all the bigWig files to be analysed with `read_coldata()` and pass it to the downstream functions.
 
 ```mermaid
 flowchart TD
@@ -58,21 +58,30 @@ flowchart TD
     D2 --> D3[volcano_plot]
 ```
 
+```r
+#Path to bigWig files
+bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", 
+            "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
+
+#Make a table of bigWigs along with ref genome build
+bigWigs = read_coldata(bws = bigWigs, build = "hg19")
+```
+
 ## trackplots
 
 `track_extract()` and `track_plot()` are two functions to generate IGV style track plots (aka locus plots) from bigWig files. Additionally, `track_summarize` can summarize tracks by condition.
  
 ### Step-1: Extract signal from bigWig files 
 ```r
-#Path to bigWig files
-bigWigs = c("H1_Oct4.bw", "H1_Nanog.bw", "H1_k4me3.bw", 
-            "H1_k4me1.bw", "H1_k27ac.bw", "H1_H2az.bw", "H1_Ctcf.bw")
-
 #Region to plot
 oct4_loci = "chr6:31125776-31144789"
 
-#Extract bigWig signal
-t = track_extract(bigWigs = bigWigs, loci = oct4_loci, build = "hg19")
+#Extract bigWig signal for a loci of interest
+t = track_extract(colData = bigWigs, loci = oct4_loci)
+
+#Or you can also specifiy a gene name instead of a loci 
+# - loci and gene models will be automatically extracted from UCSC genome browser
+t = track_extract(colData = bigWigs, gene = "POUF51")
 ```
 
 
@@ -87,18 +96,20 @@ track_plot(summary_list = t)
 
 #### Add cytoband and change colors for each track
 ```r
+track_cols = c("#d35400","#d35400","#2980b9","#2980b9","#2980b9", "#27ae60","#27ae60")
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE)
 ```
 
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/a0911998-aae8-4de1-96f5-18e278d19d80)
 
-#### Add TF binding sites at the top (any bed files would do)
+#### Heighilight regions of interest (any bed files would do)
+
 ```r
 oct4_nanog_peaks = c("H1_Nanog.bed","H1_Oct4.bed") #Peak files 
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks)
 ```
@@ -116,7 +127,7 @@ In case if it is different for your data, you will have to define your own color
 chromHMM_peaks = "H1_chromHMM.bed"
 
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks, chromHMM = chromHMM_peaks)
 ```
@@ -139,7 +150,7 @@ In this case, use the argument `ucscChromHMM` with any values from TableName col
 
 ```r
 track_plot(summary_list = t, 
-          col = c("#d35400","#d35400","#27ae60","#27ae60","#2980b9","#2980b9","#2980b9"), 
+          col = track_cols, 
           show_ideogram = TRUE, 
           peaks = oct4_nanog_peaks, 
           ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
@@ -150,7 +161,7 @@ track_plot(summary_list = t,
 
 ## narrowPeaks and broadPeaks 
 
-All of the above plots can also be generated with [narroPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
+All of the above plots can also be generated with [narrowPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
 
 `narrowPeak` is one of the output from macs2 peak caller and are easier to visualize in the absence of bigWig files.
 
@@ -205,7 +216,7 @@ profile_plot(ps_refseq)
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/bd26cdac-6f87-44ed-b41c-685454c6d28c)
 
 
-### Custome BED regions
+### Custom BED regions
 
 ```r
 #BRD4 binding sites 
