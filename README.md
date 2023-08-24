@@ -166,13 +166,16 @@ All of the above plots can also be generated with [narrowPeak](https://genome.uc
 `narrowPeak` is one of the output from macs2 peak caller and are easier to visualize in the absence of bigWig files.
 
 ```r
-narrowPeaks = c("H1_Ctcf.bed", "H1_H2az.bed", "H1_k27ac.bed", "H1_k4me1.bed", 
-"H1_k4me3.bed", "H1_Nanog.bed", "H1_Oct4.bed", "H1_Pol2.bed")
+narrowPeaks = c("H1_Ctcf.bed", "H1_H2az.bed", "H1_k27ac.bed", 
+                "H1_k4me1.bed", "H1_k4me3.bed", "H1_Nanog.bed", 
+                "H1_Oct4.bed", "H1_Pol2.bed")
+
+#Use peak as input_type
+narrowPeaks = read_coldata(narrowPeaks, build = "hg19", input_type = "peak")
 
 oct4_loci = "chr6:30,818,383-31,452,182" #633Kb region for example
 
-#Use the same track_extract but, instead of `bigWigs` use the `bed` argument
-narrowPeaks_track = track_extract(bed = narrowPeaks, loci = oct4_loci, build = "hg19")
+narrowPeaks_track = track_extract(colData = narrowPeaks, loci = oct4_loci)
 
 #Rest plotting is same
 track_plot(summary_list = narrowPeaks_track, 
@@ -181,6 +184,7 @@ track_plot(summary_list = narrowPeaks_track,
           ucscChromHMM = c("wgEncodeBroadHmmH1hescHMM", "wgEncodeBroadHmmNhlfHMM"))
 
 ```
+  
 ![image](https://github.com/PoisonAlien/trackplot/assets/8164062/fa3999fd-ab7f-4617-a43e-d3cac7f3a3b3)
 
 
@@ -197,14 +201,17 @@ Example data from [GSE99183](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=
 
 ```r
 bws = c("GSM2634756_U87_BRD4.bw", "GSM2634757_U87_BRD4_dBET_24h.bw", "GSM2634758_U87_BRD4_dBET_2h.bw")
-bws = read_coldata(bws = bws, sample_names = c("BRD4", "BRD4_dBET_24h", "BRD4_dBET_2h"), build = "hg19")
+bws = read_coldata(bws = bws, 
+                  sample_names = c("BRD4", "BRD4_dBET_24h", "BRD4_dBET_2h"), 
+                  build = "hg19")
 ```
 
 ### Refseq transcripts
 
 ```r
 #Extract signals from bigWig files around refseq transcripts
-pe_refseq = profile_extract(colData = bws, ucsc_assembly = TRUE, startFrom = 'start', up = 1500, down = 1500)
+pe_refseq = profile_extract(colData = bws, ucsc_assembly = TRUE, 
+                            startFrom = 'start', up = 1500, down = 1500)
 
 #Estimate mean signal
 ps_refseq = profile_summarize(sig_list = pe_refseq) 
@@ -223,7 +230,8 @@ profile_plot(ps_refseq)
 bed = "GSM2634756_U87_BRD4_peaks.narrowPeak.gz"
 
 #Center and extend 1500 both ways from the peak center
-pe_bed = profile_extract(colData = bws, bed = bed, startFrom = "center", up = 1500, down = 1500, nthreads = 4)
+pe_bed = profile_extract(colData = bws, bed = bed, startFrom = "center", 
+                          up = 1500, down = 1500, nthreads = 4)
 
 #Estimate mean signal
 ps_bed = profile_summarize(sig_list = pe_bed) 
