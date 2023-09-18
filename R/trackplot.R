@@ -1,16 +1,12 @@
 # This R script contains functions for bigWig visualization
 #
-# track_extract() -> track_plot() : to generate IGV style track plots (aka locus plots) from bigWig files.
-# profile_extract() -> profile_plot() : to generate profile-plots from bigWig files.
-# extract_signal() -> pca_plot() : to perform PCA analysis based on genomic regions of interest or around TSS sites.
-#
 # Source code: https://github.com/PoisonAlien/trackplot
 #
 # MIT License
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
 # Change log:
-# Version: 1.5.00 
+# Version: 1.5.00 [2023-08-24]
 #   * Added `read_coldata` to import bigwig and bed files along with metadata. This streamlines all the downstream processes
 #   * Added `profile_heatmap` for plotting heatmap
 #   * Added `diffpeak` for minimal differential peak analysis based on peak intensities
@@ -20,6 +16,7 @@
 #   * `track_extract` now accepts gene name as input.
 #   * More customization to `profile_extract` `profile_plot` and `plot_pca`
 #   * Nicer output with `extract_summary` 
+#   * Update mysql query for UCSC. Added `ideoTblName` argument for `track_extract`. Issue: #19
 # Version: 1.4.00 [2023-07-27]
 #   * Updated track_plot to include chromHMM tracks and top peaks tracks
 #   * Support to draw narrowPeak or boradPeak files with track_plot
@@ -116,14 +113,15 @@ read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_t
 #' @param gtf Use gtf file or data.frame as source for gene model. Default NULL.
 #' @param build Reference genome build. Default hg38
 #' @param padding Extend locus on both sides by this many bps. 
+#' @param ideoTblName Table name for ideogram. Default `cytoBand`
 #' @import data.table
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
-#' cd = read_coldata(bws = bigWigs)
+#' cd = read_coldata(bws = bigWigs, build = "hg19")
 #' oct4_loci = "chr6:31125776-31144789"
 #' t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 #' @export
-track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0){
+track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0, ideoTblName = "cytoBand"){
   
   if(is.null(colData)){
     stop("Missing colData. Use read_coldata() to generate one.")
@@ -188,7 +186,7 @@ track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10,
       if(!is.null(etbl)){
         etbl = .make_exon_tbl(gene_models = etbl)  
       }
-      cyto = .extract_cytoband(chr = chr, refBuild = build)
+      cyto = .extract_cytoband(chr = chr, refBuild = build, tblName = ideoTblName)
     }else{
       cyto = etbl = NA
     }
@@ -1688,7 +1686,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   }
 }
 
-.extract_cytoband = function(chr = NULL, refBuild = "hg19"){
+.extract_cytoband = function(chr = NULL, refBuild = "hg19", tblName = "cytoBand"){
   
   if(!grepl(pattern = "^chr", x = chr)){
     message("Adding chr prefix to target chromosome for UCSC query..")
@@ -1696,9 +1694,9 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   }
   
   cmd = paste0(
-    "mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",
+    "mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",
     refBuild,
-    " -e 'select chrom, chromStart, chromEnd, name, gieStain from cytoBand WHERE chrom =\"",
+    " -e 'select chrom, chromStart, chromEnd, name, gieStain from ",  tblName, " WHERE chrom =\"",
     chr,
     "\"'"
   )
@@ -1772,7 +1770,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   .check_mysql()
   
-  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
+  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
   message(paste0("Extracting chromHMM from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
@@ -1796,7 +1794,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   .check_mysql()
   op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
+  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
   message(paste0("Extracting gene models from UCSC:\n", "    Gene: ", genesymbol, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   
   ucsc = data.table::fread(cmd = cmd, sep = "\t")
@@ -1821,7 +1819,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     tar_chr = chr
   }
   
-  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
+  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
   message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
@@ -2033,7 +2031,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   temp_op_bed = tempfile(pattern = "profileplot_ucsc", tmpdir = op_dir, fileext = ".bed")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.cse.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
+  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
   message(paste0("Extracting gene models from UCSC:\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)

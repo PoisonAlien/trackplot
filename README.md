@@ -81,7 +81,7 @@ t = track_extract(colData = bigWigs, loci = oct4_loci)
 
 #Or you can also specifiy a gene name instead of a loci 
 # - loci and gene models will be automatically extracted from UCSC genome browser
-t = track_extract(colData = bigWigs, gene = "POUF51")
+t = track_extract(colData = bigWigs, gene = "POU5F1")
 ```
 
 

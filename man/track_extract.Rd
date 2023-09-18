@@ -13,7 +13,8 @@ track_extract(
   query_ucsc = TRUE,
   gtf = NULL,
   build = "hg38",
-  padding = 0
+  padding = 0,
+  ideoTblName = "cytoBand"
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ track_extract(
 \item{build}{Reference genome build. Default hg38}
 
 \item{padding}{Extend locus on both sides by this many bps.}
+
+\item{ideoTblName}{Table name for ideogram. Default \code{cytoBand}}
 }
 \description{
 Extract bigWig track data for the given loci
