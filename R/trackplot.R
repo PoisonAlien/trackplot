@@ -6,6 +6,8 @@
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
 # Change log:
+# Version: 1.5.01 [2023-10-17]
+#   * Bug fix parsing loci while parsing GTF
 # Version: 1.5.00 [2023-08-24]
 #   * Added `read_coldata` to import bigwig and bed files along with metadata. This streamlines all the downstream processes
 #   * Added `profile_heatmap` for plotting heatmap
@@ -148,6 +150,9 @@ track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10,
     if(!is.null(gtf)){
       etbl = .parse_gtf(gtf = gtf, genename = gene)
       cyto = NA
+      start = min(unlist(lapply(etbl,function(x) attr(x, "start"))))
+      end = max(unlist(lapply(etbl,function(x) attr(x, "end"))))
+      chr = unique(unlist(lapply(etbl,function(x) attr(x, "chr"))))
     }else if(query_ucsc){
       message("Querying UCSC genome browser for gene model and cytoband..")
       etbl = .extract_geneModel_ucsc_bySymbol(genesymbol = gene, refBuild = build)
@@ -2015,7 +2020,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
       exon_start = as.numeric(as.character(x[feature %in% "exon"][, start]))
       exon_end = as.numeric(as.character(x[feature %in% "exon"][, end]))
       exon_tbl = data.frame(start = exon_start, end = exon_end)
-      attributes(exon_tbl) = list(start = min(x[,start], na.rm = TRUE), end = max(x[,end], na.rm = TRUE), strand = unique(x[,strand]), tx = unique(x[, name]), gene = unique(x[, name2]))
+      attributes(exon_tbl) = list(start = min(x[,start], na.rm = TRUE), end = max(x[,end], na.rm = TRUE), strand = unique(x[,strand]), tx = unique(x[, name]), gene = unique(x[, name2]), chr = unique(x[,chr]))
       exon_tbl
     })
   }
