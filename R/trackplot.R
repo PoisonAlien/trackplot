@@ -8,6 +8,7 @@
 # Change log:
 # Version: 1.5.01 [2023-10-17]
 #   * Bug fix parsing loci while parsing GTF
+#   * Small updates to profile_heatmap()
 # Version: 1.5.00 [2023-08-24]
 #   * Added `read_coldata` to import bigwig and bed files along with metadata. This streamlines all the downstream processes
 #   * Added `profile_heatmap` for plotting heatmap
@@ -917,16 +918,18 @@ profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs 
 #' @param sample_names Manually specify sample names.
 #' @param title_size size of title. Default 0.8
 #' @param top_profile Boolean. Whether to draw top profile plot.
+#' @param top_profile_h Default 2.
 #' @param zmins Manually specify min scores to include in heatmap
 #' @param zmaxs Manually specify max scores to include in heatmap
 #' @param scale Whether to row scale the matrix. Default FALSE
 #' @param file_name Default NULL. If provided saves plot as a png.
 #' @param hm_width Width of the plot. Default 1024
 #' @param hm_height Height of the plot. Default 600
+#' @param mat_order Default NULL. Sample order in which the heatmaps are drawn.
 #' @export
 profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal = FALSE, sample_names = NULL,
-                        title_size = 1, top_profile = FALSE, zmins = NULL, zmaxs = NULL,
-                        scale = FALSE, file_name = NULL, hm_width = 1024, hm_height = 600){
+                        title_size = 1, top_profile = FALSE, top_profile_h = 2, zmins = NULL, zmaxs = NULL,
+                        scale = FALSE, file_name = NULL, hm_width = 1024, hm_height = 600, mat_order = NULL){
   
   
   if(!sortBy %in% c("mean", "median")){
@@ -943,12 +946,19 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
   size = attr(mat_list$data, "args")
   mat_list = mat_list$data
   
+  if(!is.null(mat_order)){
+    if(length(mat_order) != length(mat_list)){
+      stop("Length of mat_order should be the same as number of bw files! [", length(mat_list), "]")
+    }
+    mat_list = mat_list[mat_order]
+  }
+  
   mat_list = .order_matrix(mats = mat_list, sortBy = sortBy)
   
   if(top_profile){
     profile_dat = .summarizeMats(mats = mat_list, summarizeBy = "mean")
-    yl = c(min(unlist(x = profile_dat[1:(length(profile_dat)-1)]), na.rm = TRUE),
-           max(unlist(x = profile_dat[1:(length(profile_dat)-1)]), na.rm = TRUE))
+    yl = c(min(unlist(x = profile_dat), na.rm = TRUE),
+           max(unlist(x = profile_dat), na.rm = TRUE))
     yl = round(x = yl, digits = 2)
     
   }
@@ -957,16 +967,20 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
   
   if(!is.null(zmins)){
     if(length(zmins) != length(mat_list)){
-      message("zmins are recycled")
+      warning("zmins are recycled")
       zmins = rep(zmins, length(mat_list))
     }
+  }else{
+    zmins = unlist(lapply(profile_dat, min, na.rm = TRUE))
   }
   
   if(!is.null(zmaxs)){
     if(length(zmaxs) != length(mat_list)){
-      message("zmaxs are recycled")
+      warning("zmaxs are recycled")
       zmaxs = rep(zmaxs, length(mat_list))
     }
+  }else{
+    zmaxs = unlist(lapply(profile_dat, max, na.rm = TRUE))
   }
   
   if(!is.null(sample_names)){
@@ -989,7 +1003,7 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
   
   if(top_profile){
     lo_mat = matrix(data = 1:(nsamps*2), nrow = 2, ncol = nsamps)
-    lo = layout(mat = lo_mat, heights = c(1, 9))
+    lo = layout(mat = lo_mat, heights = c(top_profile_h, 9))
   }else{
     lo_mat = matrix(data = 1:nsamps, nrow = 1)
     lo = layout(mat = lo_mat)
@@ -998,7 +1012,7 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
   for(i in 1:nsamps){
     
     if(top_profile){
-      .plot_profile_mini(plot_dat = profile_dat, index = i, ylims = yl)
+      .plot_profile_mini(plot_dat = profile_dat, index = i, ylims = c(zmins[i], zmaxs[i]))
     }
     
     par(mar = c(3,2,1.5,1), las=1, tcl=-.25)
@@ -2422,7 +2436,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   #grid(col = "gray90")
   points(x, y, type = "l", lwd = 1.2)
   axis(side = 2, at = ylims, lwd = 1, line = -0.6, labels = NA)
-  mtext(side = 2, at = ylims, lwd = 1, line = -0.05, text = ylims, cex = 0.8, font = 1, las = 2)
+  mtext(side = 2, at = ylims, lwd = 1, line = -0.05, text = round(ylims, digits = 2), cex = 0.8, font = 1, las = 2)
 }
 
 # Order matrices

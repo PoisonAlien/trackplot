@@ -43,7 +43,7 @@ Extract bigWig track data for the given loci
 }
 \examples{
 bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\\\.bw$", full.names = TRUE) 
-cd = read_coldata(bws = bigWigs)
+cd = read_coldata(bws = bigWigs, build = "hg19")
 oct4_loci = "chr6:31125776-31144789"
 t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 }

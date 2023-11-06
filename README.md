@@ -258,14 +258,20 @@ profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
 
 * [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
 * [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). 
-Or, you could also add the path where bwtool is located to R session with the below command.
 
-```r
+1. For macOS: Please download the pre-build binary from [here](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1)
+
+Make it executable with `chmod +x bwtool`. macOS gatekeeper might complain that it can't run the binary downloaded from the internet. If so, [allow](https://support.apple.com/en-us/HT202491) it in the security settings. 
+
+2. For centOS or debian: Follow these [compilation instructions](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8).
+
+Finally move the `bwtool` binary to a PATH (e.g; /usr/local/bin) or a directory under the PATH. Alternatively, you could also add the path where bwtool is located to R session with the below command.
+
+```{r, eval=FALSE}
 #Example
 Sys.setenv(PATH = paste("/Users/anand/Documents/bwtool_dir/", Sys.getenv("PATH"), sep=":"))
 ```
 
-* If you have trouble compiling the tool, follow [these](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8) instructions. Alternatively, you can download the pre-built binary for [macOS](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1) or [centOS](https://www.dropbox.com/s/77ek89jqfhcmouu/bwtool_centOS_x86_64.tar.gz?dl=1)
 
 ***PSA*** If you find the tool useful, consider starrig this repository or upvoting this [Biostars thread](https://www.biostars.org/p/475853/) so that more poeple can find it :)
 

@@ -12,12 +12,14 @@ profile_heatmap(
   sample_names = NULL,
   title_size = 1,
   top_profile = FALSE,
+  top_profile_h = 2,
   zmins = NULL,
   zmaxs = NULL,
   scale = FALSE,
   file_name = NULL,
   hm_width = 1024,
-  hm_height = 600
+  hm_height = 600,
+  mat_order = NULL
 )
 }
 \arguments{
@@ -35,6 +37,8 @@ profile_heatmap(
 
 \item{top_profile}{Boolean. Whether to draw top profile plot.}
 
+\item{top_profile_h}{Default 2.}
+
 \item{zmins}{Manually specify min scores to include in heatmap}
 
 \item{zmaxs}{Manually specify max scores to include in heatmap}
@@ -46,6 +50,8 @@ profile_heatmap(
 \item{hm_width}{Width of the plot. Default 1024}
 
 \item{hm_height}{Height of the plot. Default 600}
+
+\item{mat_order}{Default NULL. Sample order in which the heatmaps are drawn.}
 }
 \description{
 Draw a heatmap
