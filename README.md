@@ -2,6 +2,7 @@
 
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/poisonalien/trackplot.svg)](https://github.com/poisonalien/trackplot/issues)
 <!-- badges: end -->
 
 ## Introduction
@@ -10,7 +11,7 @@
 
 ## Installation
 
-`trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go! See below for [dependencies](https://github.com/PoisonAlien/trackplot#dependencies).
+`trackplot.R` is a standalone R script and requires no installation. Just source it and you're good to go!
 
 ```r
 source("https://github.com/PoisonAlien/trackplot/blob/master/R/trackplot.R?raw=true")
@@ -38,6 +39,15 @@ Why `trackplot`?
   * Customization: Each plot can be customized for color, scale, height, width, etc.
   * Tracks can be summarized per condition (by mean, median, max, min)
   * PCA and, optional differential peak analysis with `limma` when using uniformly processed, normalized bigWig files.
+
+## Dependencies
+
+1. [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
+2. [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`) or a directory under the PATH. 
+
+* For macOS: Please download the pre-build binary from [here](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1). Make it executable with `chmod +x bwtool`. macOS gatekeeper might complain that it can't run the binary downloaded from the internet. If so, [allow](https://support.apple.com/en-us/HT202491) it in the security settings. 
+
+* For centOS or debian: Follow these [compilation instructions](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8).
 
 ## Usage
 
@@ -158,6 +168,27 @@ track_plot(summary_list = t,
 
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/fecf7ab1-44cb-4308-b3f4-d8ca03cdd15d)
 
+### Re-organize tracks
+
+By default tracks are organized from top to bottom as `c("p", "b", "h", "g", "c")`  corresponding to peaks track, bigWig track, chromHmm track, gene track, and cytoband track. This can be changes with the argument `layout_ord`. Furthermore, bigWig tracks themselves can be ordered with the argument `bw_ord` which accepts the names of the bigWig tracks as input and plots them in the given order.
+
+```r
+#Draw only NANOG, OCT4 bigWigs in that order. Re-organize the layout in the order chromHMM track, gene track, cytoband track. Rest go to the end.
+track_plot(
+  summary_list = t,
+  col = track_cols,
+  show_ideogram = TRUE,
+  genename = c("POU5F1", "TCF19"),
+  peaks = oct4_nanog_peaks,
+  peaks_track_names = c("NANOG", "OCT4"),
+  groupAutoScale = FALSE, ucscChromHMM = "wgEncodeBroadHmmH1hescHMM", y_min = 0, 
+  bw_ord = c("NANOG", "OCT4"), 
+  layout_ord = c("h", "g", "c")
+)
+```
+
+![](https://github.com/PoisonAlien/trackplot/assets/8164062/11c9fe9b-0292-40af-8197-7f20a5275f01)
+
 
 ## narrowPeaks and broadPeaks 
 
@@ -254,26 +285,8 @@ profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/a82eedc8-a3f3-4439-a005-13242fce7929)
 
 
-## Dependencies
 
-* [data.table](https://cran.r-project.org/web/packages/data.table/index.html) R package - which itself has no dependency.
-* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). 
-
-1. For macOS: Please download the pre-build binary from [here](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1)
-
-Make it executable with `chmod +x bwtool`. macOS gatekeeper might complain that it can't run the binary downloaded from the internet. If so, [allow](https://support.apple.com/en-us/HT202491) it in the security settings. 
-
-2. For centOS or debian: Follow these [compilation instructions](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8).
-
-Finally move the `bwtool` binary to a PATH (e.g; /usr/local/bin) or a directory under the PATH. Alternatively, you could also add the path where bwtool is located to R session with the below command.
-
-```{r, eval=FALSE}
-#Example
-Sys.setenv(PATH = paste("/Users/anand/Documents/bwtool_dir/", Sys.getenv("PATH"), sep=":"))
-```
-
-
-***PSA*** If you find the tool useful, consider starrig this repository or upvoting this [Biostars thread](https://www.biostars.org/p/475853/) so that more poeple can find it :)
+***PSA*** If you find the tool useful, consider starring this repository or upvoting this [Biostars thread](https://www.biostars.org/p/475853/) so that more poeple can find it :)
 
 ### Caveat
 

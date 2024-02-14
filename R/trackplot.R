@@ -6,6 +6,9 @@
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
 # Change log:
+# Version: 1.5.10 [2024-02-14]
+#   * Added argument `layout_ord` and `bw_ord` to `track_plot()` re-order the overall tracks and bigWig tracks
+#   * Added `xlab` and `ylab` arguments to `profile_plot()`
 # Version: 1.5.01 [2023-10-17]
 #   * Bug fix parsing loci while parsing GTF
 #   * Small updates to profile_heatmap()
@@ -313,6 +316,8 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param peaks_track_height Default 2.
 #' @param bw_track_height Default 3
 #' @param left_mar Space to the left. Default 4
+#' @param bw_ord Names of the tracks to be drawn in the provided order. Default NULL.
+#' @param layout_ord Plot layout order. Deafult c("p", "b", "h", "g", "c") corresponding to peaks track, bigWig track, chromHmm track, gene track, cytoband track.
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
 #' cd = read_coldata(bws = bigWigs, build = "hg19")
@@ -350,7 +355,9 @@ track_plot = function(summary_list = NULL,
                       chromHMM_track_height = 1,
                       cytoband_track_height = 2,
                       peaks_track_names = NULL,
-                      left_mar = NULL
+                      left_mar = NULL,
+                      bw_ord = NULL,
+                      layout_ord = c("p", "b", "h", "g", "c")
 ){
   
   if(is.null(summary_list)){
@@ -379,6 +386,18 @@ track_plot = function(summary_list = NULL,
   # build = attr(summary_list, "refbuild")
   
   summary_list = summary_list$data
+  
+  #Change the order
+  if(!is.null(bw_ord)){
+    bw_ord = intersect(names(summary_list), bw_ord)
+    
+    if(length(bw_ord) == 0){
+      stop("None of the provided bw_ord are presnt in the data! Available names:\n", paste(names(summary_list), collapse = ", "))
+    }
+    
+    summary_list = summary_list[bw_ord]
+    coldata = data.table::rbindlist(split(coldata, coldata$bw_sample_names)[bw_ord])
+  }
   
   if(length(col) != length(summary_list)){
     col = rep(x = col, length(summary_list))
@@ -454,7 +473,7 @@ track_plot = function(summary_list = NULL,
   
   lo = .make_layout(ntracks = ntracks, ntracks_h = bw_track_height, cytoband = show_ideogram, cytoband_h = cytoband_track_height, genemodel = draw_gene_track, 
                genemodel_h = gene_track_height, chrHMM = any(!is.null(ucscChromHMM), !is.null(chromHMM)), chrHMM_h = chromHMM_track_height, loci = !is.null(peaks), 
-               loci_h = peaks_track_height, scale_track_height = scale_track_height)
+               loci_h = peaks_track_height, scale_track_height = scale_track_height, lord = layout_ord)
   
   query = data.table::data.table(chr = chr, start = start, end = end)
   data.table::setkey(x = query, chr, start, end)
@@ -864,8 +883,10 @@ profile_summarize = function(sig_list = NULL, stat = "mean", condition = NULL){
 #' @param line_size Default 1
 #' @param legend_fs Legend font size. Default 1
 #' @param axis_fs Axis font size. Default 1
+#' @param xlab x axis label. Default NA
+#' @param ylab y axis label. Default NA
 #' @export
-profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs = 1, axis_fs = 1){
+profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs = 1, axis_fs = 1, xlab = NA, ylab = NA){
   
   if(is.null(sig_list)){
     stop("Missing input! Expecting output from profile_summarize()")
@@ -894,7 +915,7 @@ profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs 
                       length(sig_summary[[1]]))
   
   #line_size = 1
-  par(mar = c(3, 3, 2, 1))
+  par(mar = c(4, 4, 2, 1))
   plot(NA, xlim = c(0, x_max), ylim = c(min(ylabs), max(ylabs)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
   abline(h = ylabs, v = pretty(xticks), col = "gray90", lty = 2)
   
@@ -905,6 +926,9 @@ profile_plot = function(sig_list = NULL, color = NULL, line_size = 1, legend_fs 
   axis(side = 2, at = ylabs, las = 2, cex.axis = axis_fs)
   
   legend(x = "topright", legend = names(sig_summary), col = color, bty = "n", lty = 1, lwd = 1.2, cex = legend_fs, xpd = TRUE)
+  
+  mtext(text = xlab, side = 1, line = 2.5, cex = 1)
+  mtext(text = ylab, side = 2, line = 2.5, cex = 1)
   
   invisible(list(mean_signal = sig_summary, color_codes = color, xticks = xticks, xlabs = xlabs))
 }
@@ -1528,7 +1552,11 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   legend(...)
 }
 
-.make_layout = function(ntracks, ntracks_h = 3, cytoband = TRUE, cytoband_h = 1, genemodel = TRUE, genemodel_h = 1, chrHMM = TRUE, chrHMM_h = 1, loci = TRUE, loci_h = 2, scale_track_height = 1){
+.make_layout = function(ntracks, ntracks_h = 3, cytoband = TRUE, cytoband_h = 1, genemodel = TRUE, genemodel_h = 1, chrHMM = TRUE, chrHMM_h = 1, loci = TRUE, loci_h = 2, scale_track_height = 1, lord = NULL){
+  
+  #track heights (peaks, bigwig tracks, chromHMM, gene model, cytoband, scale)
+  lo_h_ord =  list("p" = loci_h, "b" = rep(ntracks_h, ntracks), "h" = chrHMM_h, "g" = genemodel_h, "c" = cytoband_h, "s" = scale_track_height)
+  mat_ord = c("p" = 1, "b" = 2, "h" = 3, "g" = 4, "c" = 5, "s" = 6)
   
   case = NULL
   #print(paste(cytoband, genemodel, chrHMM, loci, sep = ", "))
@@ -1536,63 +1564,113 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   if(cytoband & genemodel & chrHMM & loci){
     #print("all")
     case = 1
+    lo_h_ord = lo_h_ord[c("p", "b", "h", "g", "s", "c")] #c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h)
   }else if(cytoband & genemodel & chrHMM == FALSE & loci){
     #print("no hmm")
     case = 2
+    lo_h_ord = lo_h_ord[c("p", "b", "g", "s", "c")] #c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h)
   }else if(cytoband & genemodel & chrHMM == FALSE & loci == FALSE){
     #print("no hmm and no loci")
     case = 3
+    lo_h_ord = lo_h_ord[c("b", "g", "s", "c")] #c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h)
   }else if(cytoband & genemodel == FALSE & chrHMM == FALSE & loci == FALSE){
     #print("no hmm and no loci and no genemodel")
     case = 4
+    lo_h_ord = lo_h_ord[c("b", "s", "c")] #c(rep(ntracks_h, ntracks), scale_track_height, cytoband_h)
   }else if(cytoband == FALSE & genemodel == FALSE & chrHMM == FALSE & loci == FALSE){
     #print("no hmm and no loci and no genemodel and no cytoband")
     case = 5
+    lo_h_ord = lo_h_ord[c("b", "s")] #c(rep(ntracks_h, ntracks), scale_track_height)
   }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == TRUE & loci == FALSE){
     #print("no loci and no cytoband")
     case = 6
+    lo_h_ord = lo_h_ord[c("b", "h", "g", "s")] #c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height)
   }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == TRUE & loci == TRUE){
     #print("no cytoband")
     case = 7
+    lo_h_ord = lo_h_ord[c("p", "b", "h", "g", "s")] #c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height)
   }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == FALSE & loci == TRUE){
     #print("no cytoband no chrHMM")
     case = 8
+    lo_h_ord = lo_h_ord[c("p", "b", "g", "s")] #c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height)
   }else if(cytoband == FALSE & genemodel == TRUE & chrHMM == FALSE & loci == FALSE){
     #print("no cytoband no chrHMM no loci")
     case = 9
+    lo_h_ord = lo_h_ord[c("b", "g", "s")] #c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height)
   }else if(cytoband == TRUE & genemodel == TRUE & chrHMM == TRUE & loci == FALSE){
     #print("no loci")
     case = 10
+    lo_h_ord = lo_h_ord[c("b", "h", "g", "s", "c")] #c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h)
   }else if(cytoband == TRUE & genemodel == FALSE & chrHMM == FALSE & loci == TRUE){
     #print("no genemodel no chrhmm")
     case = 11
+    lo_h_ord = lo_h_ord[c("p", "b", "s", "c")] #c(loci_h, rep(ntracks_h, ntracks), scale_track_height, cytoband_h)
   }else{
     #print("Something is wrong!")
   }
   
-  if(case == 1){
-    lo = layout(mat = matrix(data = seq_len(ntracks+5)), heights = c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h))
-  }else if(case == 2){
-    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h))
-  }else if(case == 3){
-    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height, cytoband_h))
-  }else if(case == 4){
-    lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(ntracks_h, ntracks), scale_track_height, cytoband_h))
-  }else if(case == 5){
-    lo = layout(mat = matrix(data = seq_len(ntracks+1)), heights = c(rep(ntracks_h, ntracks), scale_track_height))
-  }else if(case == 6){
-    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height))
-  }else if(case == 7){
-    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(loci_h, rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height))
-  }else if(case == 8){
-    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(loci_h, rep(ntracks_h, ntracks), genemodel_h, scale_track_height))
-  }else if(case == 9){
-    lo = layout(mat = matrix(data = seq_len(ntracks+2)), heights = c(rep(ntracks_h, ntracks), genemodel_h, scale_track_height))
-  }else if(case == 10){
-    lo = layout(mat = matrix(data = seq_len(ntracks+4)), heights = c(rep(ntracks_h, ntracks), chrHMM_h, genemodel_h, scale_track_height, cytoband_h))
-  }else if(case == 11){
-    lo = layout(mat = matrix(data = seq_len(ntracks+3)), heights = c(loci_h, rep(ntracks_h, ntracks), scale_track_height, cytoband_h))
+  lord = c(lord, "s")
+  lord = c(intersect(lord, names(lo_h_ord)), setdiff(names(lo_h_ord), lord))
+  lo_heights = unlist(lo_h_ord[lord], use.names = FALSE)
+  lo = lo_h_ord[lord]
+  
+  #Order in which plots are drawn by default
+  plot_ord = data.frame(row.names = c("p", "b", "h", "g", "s", "c"), name = c("p", "b", "h", "g", "s", "c"), ord = 1:6)
+  plot_ord = plot_ord[names(lo),,drop = FALSE]
+  plot_ord$ord_req = 1:nrow(plot_ord) #Required order
+  plot_ord = plot_ord[order(plot_ord$ord),]
+  
+  ### Re-organize the layout by user specification
+  dt = data.table::data.table(name = plot_ord$name, ord = plot_ord$ord, ord_req = plot_ord$ord_req)
+  dt$n_tracks = ifelse(test = dt$name == 'b', yes = ntracks, no = 1)
+  dt_s = split(dt, dt$n_tracks)
+  if(length(dt_s) > 1){
+    dt_mult = dt_s[[2]]
+    dt_sing = dt_s[[1]]
+    dt_sing[,n_tracks := 1]
+    dt_sing$ord_req2 = dt_sing$ord_req
+    dt_mult = data.table::data.table(name = rep(dt_mult$name, dt_mult$n_tracks), ord = dt_mult$ord, ord_req = dt_mult$ord_req, ord_req2 = seq(dt_mult$ord_req, dt_mult$ord_req + dt_mult$n_tracks -1 , 1), n_tracks = dt_mult$n_tracks)
+    
+    dt = data.table::rbindlist(l = list(dt_sing, dt_mult), use.names = TRUE, fill = TRUE)
+    dt = dt[order(ord_req)]
+    
+    dt = split(dt, dt$ord) |> data.table::rbindlist()
+    dt[, ord_req4 := 1:nrow(dt)]
+    dt = dt[order(ord_req)]
+    data = dt$ord_req4
+  }else{
+    dt = data.table::data.table(name = rep(dt$name, dt$n_tracks), ord = dt$ord, ord_req = dt$ord_req, ord_req2 = seq(dt$ord_req, dt$ord_req + dt$n_tracks -1 , 1), n_tracks = dt$n_tracks)
+    dt = split(dt, dt$ord) |> data.table::rbindlist()
+    dt[, ord_req4 := 1:nrow(dt)]
+    dt = dt[order(ord_req)]
+    data = dt$ord_req
   }
+
+  if(case == 1){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 2){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 3){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 4){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 5){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 6){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 7){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 8){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 9){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 10){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }else if(case == 11){
+    lo = layout(mat = matrix(data = data), heights = lo_heights)
+  }
+  
+  lo_h_ord[lord]
 }
 
 .gen_windows = function(chr = NA, start, end, window_size = 50, op_dir = getwd()){
@@ -1938,7 +2016,8 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     xdt
   })
   tx_tbl = data.table::rbindlist(l = tx_tbl)
-  tx_tbl = tx_tbl[,id := paste0(start, ":", end)][!duplicated(id), ,.(gene)]
+  tx_tbl[,id := paste0(start, ":", end)]
+  tx_tbl = tx_tbl[!duplicated(id)]
   
   exon_tbls = lapply(split(tx_tbl, as.factor(as.character(tx_tbl$gene))), function(x){
     x = x[order(start)]

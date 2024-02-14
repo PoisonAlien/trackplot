@@ -9,7 +9,9 @@ profile_plot(
   color = NULL,
   line_size = 1,
   legend_fs = 1,
-  axis_fs = 1
+  axis_fs = 1,
+  xlab = NA,
+  ylab = NA
 )
 }
 \arguments{
@@ -22,6 +24,10 @@ profile_plot(
 \item{legend_fs}{Legend font size. Default 1}
 
 \item{axis_fs}{Axis font size. Default 1}
+
+\item{xlab}{x axis label. Default NA}
+
+\item{ylab}{y axis label. Default NA}
 }
 \description{
 Draw a profile plot

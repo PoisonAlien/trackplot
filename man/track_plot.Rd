@@ -35,7 +35,9 @@ track_plot(
   chromHMM_track_height = 1,
   cytoband_track_height = 2,
   peaks_track_names = NULL,
-  left_mar = NULL
+  left_mar = NULL,
+  bw_ord = NULL,
+  layout_ord = c("p", "b", "h", "g", "c")
 )
 }
 \arguments{
@@ -100,6 +102,10 @@ track_plot(
 \item{peaks_track_names}{Provide a name for each loci bed file. Default NULL}
 
 \item{left_mar}{Space to the left. Default 4}
+
+\item{bw_ord}{Names of the tracks to be drawn in the provided order. Default NULL.}
+
+\item{layout_ord}{Plot layout order. Deafult c("p", "b", "h", "g", "c") corresponding to peaks track, bigWig track, chromHmm track, gene track, cytoband track.}
 }
 \description{
 Generate IGV style locus tracks with ease

@@ -1,0 +1,340 @@
+---
+title: "trackplot tutorial"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    number_sections: yes
+    self_contained: yes
+vignette: >
+  %\VignetteIndexEntry{01: trackplot tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Introduction
+
+`trackplot` is an ultra-fast, simple, and minimal dependency R script to generate IGV style track plots (aka locus plots), profile plots, and heatmaps from bigWig files. 
+Libraries in R such as `Gviz` and `karyoploteR` facilitates such visualization but they are slow, complicated, and come with a large number of dependencies.
+
+`trackplot` overcomes the [dependency heaviness](https://en.wikipedia.org/wiki/Dependency_hell) by taking advantage of existing `bwtool` for faster bigWig processing, and by performing all the plotting in base R.
+
+Some of the features include:
+
+  * It's significantly fast since most of the heavy lifting is done by [bwtool](https://github.com/CRG-Barcelona/bwtool). 
+  * Automatically queries UCSC genome browser for gene models, cytobands, and chromHMM tracks - making analysis reproducible.
+  * Supports GTF and standard UCSC gene formats as well.
+  * Lightweight and minimal dependency 
+    - [data.table](https://cran.r-project.org/web/packages/data.table/index.html) and [bwtool](https://github.com/CRG-Barcelona/bwtool) are the only requirements. 
+    - Plots are generated in pure base R graphics (no ggplot2 or tidyverse packages)
+  * Customization: Each plot can be customized for color, scale, height, width, etc.
+  * Tracks can be summarized per condition (by mean, median, max, min)
+
+## Pre-requisites
+
+* [bwtool](https://github.com/CRG-Barcelona/bwtool) - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`). 
+Or, you could also add the path where bwtool is located to R session with the below command.
+
+```r
+#Example
+Sys.setenv(PATH = paste("/Users/anand/Documents/bwtool_dir/", Sys.getenv("PATH"), sep=":"))
+```
+
+* If you have trouble compiling the tool, follow [these](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8) instructions. Alternatively, you can download the pre-built binary for [macOS](https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1) or [centOS](https://www.dropbox.com/s/77ek89jqfhcmouu/bwtool_centOS_x86_64.tar.gz?dl=1)
+
+
+# Usage
+
+Here ENCODE data from human embryonic stem cell line `H1` are used for demonstration. 
+
+```{r setup}
+library(trackplot)
+```
+
+All you need is a list of bigWig files to be analyzed. Make a column data of bigWig file names with `read_coldata()`. 
+
+```{r, importBW}
+bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
+
+#Generate a coldata table 
+h1 = trackplot::read_coldata(bigWigs, build = "hg19")
+
+print(h1)
+
+#You can add any sort of metadata such as condition, treatment, etc to the above - similar to coldata in RNA-Seq analysis. 
+```
+
+Above table will be the input for most of the downstream functions.
+
+<img src="https://github.com/PoisonAlien/trackplot/assets/8164062/a6624174-34ff-4e6c-af2d-8a41e247d5fe" style="width:600px;"/>
+
+# trackplot
+
+`trackplot` generates an IGV style tracks with signal intensities, gene models and other desired annotation.
+
+It is a two step process involving `track_extract()` -> `track_plot()`
+
+## Extract signal
+
+Extract bigWig signal for the genomic regions of interest. This can be either 
+
+* a genomic loci [e.g; `chr6:31115776-31154789`]
+* a gene name [e.g; `POU5F1`]
+
+```{r}
+#Region to plot
+oct4_loci = "chr6:31125776-31144789"
+
+#Extract bigWig signal for the above loci
+t_loci = track_extract(colData = h1, loci = oct4_loci)
+
+#To extract bigWig signal for the gene of interest
+# t_gene = track_extract(colData = h1, gene = "POU5F1")
+```
+
+## Plot
+
+### Basic plot
+
+```{r, plot1, fig.height=5, fig.width=7}
+track_plot(summary_list = t_loci)
+```
+
+### Change colors for each track
+
+```{r, plot_col, fig.height=5, fig.width=7}
+track_cols = c("#d35400","#d35400","#2980b9","#2980b9","#2980b9", "#27ae60","#27ae60")
+track_plot(summary_list = t_loci, col = track_cols)
+```
+
+### Heighlight sites at the top
+
+Using BED files or data.frame in BED format to heightlight target regions of interest
+
+```{r, plot_tfbs, fig.height=5.2, fig.width=7}
+tf_beds = system.file("extdata", "narrowpeak", package = "trackplot") |> list.files(pattern = "Nanog|Oct4", full.names = TRUE) 
+print(basename(tf_beds))
+track_plot(
+  summary_list = t_loci,
+  col = track_cols,
+  peaks = tf_beds,
+  peaks_track_names = c("NANOG", "OCT4")
+)
+```
+
+### Show only specific genes
+
+Use `genename` argument to show only specific genes in the gene track
+
+```{r, plot_geneneames, fig.height=5.2, fig.width=7}
+track_plot(
+  summary_list = t_loci,
+  col = track_cols,
+  peaks = tf_beds,
+  peaks_track_names = c("NANOG", "OCT4"),
+  genename = c("POU5F1", "TCF19")
+)
+```
+
+### Include chromHMM data
+
+chromHMM data should be a BED file with the 4th column containing chromatin state. See here for an [example](https://github.com/PoisonAlien/trackplot/blob/master/inst/extdata/narrowpeak/H1_chromHMM.bed) file. 
+
+```{}
+chr6    31125621        31126021        1
+chr6    31126021        31127821        2
+chr6    31127821        31128221        6
+chr6    31128221        31129421        11
+```
+
+
+Note that the color code for each of the 15 states are as described [here](https://genome.ucsc.edu/cgi-bin/hgTrackUi?g=wgEncodeBroadHmm&db=hg19). 
+In case if it is different for your data, you will have to define your own color codes for each state and pass it to the argument `chromHMM_cols`
+
+```{r, plot_chrHMM, fig.height=5.2, fig.width=7}
+#Example chromHMM data for H1 from UCSC
+h1_chrHMM = system.file("extdata", "narrowpeak", "H1_chromHMM.bed", package = "trackplot") 
+
+track_plot(
+  summary_list = t_loci,
+  col = track_cols,
+  peaks = tf_beds,
+  peaks_track_names = c("NANOG", "OCT4"),
+  genename = c("POU5F1", "TCF19"),
+  chromHMM = h1_chrHMM,
+  chromHMM_names = "H1"
+)
+```
+
+
+## Re-organize tracks
+
+By default tracks are organized from top to bottom as `c("p", "b", "h", "g", "c")`  corresponding to peaks track, bigWig track, chromHmm track, gene track, and cytoband track. This can be changes with the argument `layout_ord`. Furthermore, bigWig tracks themselves can be ordered with the argument `bw_ord` which accepts the names of the bigWig tracks as input and plots them in the given order.
+
+```{r}
+#Re-organize the layout in the order chromHMM track, gene track, cytoband track, bigWig tracks and peak track.
+track_plot(
+  summary_list = t_loci,
+  col = track_cols,
+  peaks = tf_beds,
+  peaks_track_names = c("NANOG", "OCT4"),
+  genename = c("POU5F1", "TCF19"),
+  chromHMM = h1_chrHMM,
+  chromHMM_names = "H1", layout_ord = c("h", "g", "c", "b", "p")
+)
+```
+
+## Peak files as input
+
+All of the above plots can also be generated with [narrowPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format12) or [broadPeak](https://genome.ucsc.edu/FAQ/FAQformat.html#format13) files as input. Here, 5th column containing scores are plotted as intensity. Color coding and binning of scores are as per [UCSC convention](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)
+
+`narrowPeak` is one of the output from macs2 peak caller and are easier to visualize in the absence of bigWig files. 
+Process is similar, `read_coldata` -> `track_extract` -> `track_plot`
+
+```{r plot_narrowPeak, fig.height=5.2, fig.width=7}
+narrowPeak_files = system.file("extdata", "narrowpeak", package = "trackplot") |> list.files(pattern = "\\.bed$", full.names = TRUE) |> grep(pattern = "chromHMM.bed$", invert = TRUE, value = TRUE) 
+print(basename(narrowPeak_files))
+
+#Generate a coldata table 
+h1_peaks = read_coldata(narrowPeak_files, build = "hg19", input_type = "peak")
+
+#Extract signal intensities from narrowPeak files
+oct4_loci = "chr6:30,818,383-31,452,182" #633Kb region for example
+t_loci2 = track_extract(colData = h1_peaks, loci = oct4_loci)
+
+#Plot
+track_plot(
+    summary_list = t_loci2,
+    col = track_cols,
+    peaks = tf_beds,
+    peaks_track_names = c("NANOG", "OCT4"),
+    genename = c("POU5F1", "TCF19"),
+    chromHMM = h1_chrHMM,
+    chromHMM_names = "H1"
+)
+```
+
+# profileplot
+
+Example data from [GSE99183](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE99183) where U87 glioma cell lines are treated with a DMSO and a BRD4 degradaer.
+
+```{r, profile_plot, fig.height=5.2, fig.width=7}
+bws = list.files(path = "/Users/anandmayakonda/Documents/Documents_MacBookPro_work/github/data.nosync/GSE99183_U87_BRD4/", pattern = "bw", full.names = TRUE)
+bws = grep(pattern = "BRD3|BRD2|H3K27Ac|Pol2|H3K4|E2F1", x = bws, value = TRUE, invert = TRUE)
+print(basename(bws))
+```
+
+```{r, profile_plot_cd}
+bws = trackplot::read_coldata(bws = bws, sample_names = c("BRD4", "BRD4_dBET_24h", "BRD4_dBET_2h"), build = "hg19")
+
+#Add some metadata info
+bws$condition = c("dmso", "dBET", "dBET")
+
+print(bws)
+```
+
+`profile_extract()` -> `profile_summarize()` -> `profile_plot()`
+
+### Around TSS
+
+Setting `ucsc_assembly = TRUE` will fetch refseq transcripts from UCSC browser and plots the signal distribution around the TSS or TES.
+
+```{r, profilePlot_tss, fig.height=5, fig.width=5}
+#Extract signals from bigWig files around refseq transcripts
+pe_refseq = trackplot::profile_extract(colData = bws, ucsc_assembly = TRUE, startFrom = 'start', up = 1500, down = 1500)
+#Estimate mean signal
+ps_refseq = trackplot::profile_summarize(sig_list = pe_refseq) 
+```
+
+```{r, fig.height=5, fig.width=6}
+#Plot
+trackplot::profile_plot(ps_refseq, legend_fs = 0.7, xlab = "TSS", ylab = "RPM")
+```
+
+### Around BED regions of intersert
+
+Providing a BED file or a data.frame in BED format..
+
+```{r, profilePlot_bed}
+#BRD4 binding sites 
+bed = "/Users/anandmayakonda/Documents/Documents_MacBookPro_work/github/data.nosync/GSE99183_U87_BRD4/GSM2634756_U87_BRD4_peaks.narrowPeak"
+#Center and extend 1500 both ways from the peak center
+pe_bed = trackplot::profile_extract(colData = bws, bed = bed, startFrom = "center", up = 1500, down = 1500, nthreads = 4)
+#Estimate mean signal
+ps_bed = trackplot::profile_summarize(sig_list = pe_bed) 
+```
+
+```{r, fig.height=5, fig.width=6}
+#Plot
+trackplot::profile_plot(ps_bed, legend_fs = 0.7, xlab = "peak center", ylab = "RPM")
+```
+
+# heatmap
+
+Output from `profile_extract` can be used to draw a heatmap with `profile_heatmap`
+
+```{r, heatmap, fig.height=7, fig.width=5}
+trackplot::profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
+```
+
+
+# Peak intensities
+
+Extract peak intensities. Similar to `profile_extract`, setting `ucsc_assembly = TRUE` will fetch refseq transcripts from UCSC browser and extracts peak intensities aroud the TSS or TES.
+
+```{r, es}
+tss_summary = trackplot::extract_summary(colData = bws, ucsc_assembly = TRUE, up = 1500, down = 1500) #For TSS regions
+bed_summary = trackplot::extract_summary(colData = bws, bed = bed, up = 1500, down = 1500) #For BED regions
+```
+
+output includes peak intensities across all the sites
+
+```{r, esdata}
+print(tss_summary$data)
+```
+
+Above signal intensities can be used to perform PCA analysis or do differential peak analysis.
+
+## PCA 
+
+```{r, espca}
+trackplot::pca_plot(summary_list = tss_summary, log2 = TRUE, color_by = "condition", lab_size = 0.6)
+```
+
+
+## Differential peak analysis
+
+Although not recommended, above peak intensities can be used to perform a differential peak analysis between two conditions using [limma](https://www.bioconductor.org/packages/release/bioc/html/limma.html)
+
+WARNING: Please make sure that the bigWigs contain normalized intensities such as RPM. Otherwise you should strongly consider using tools such as [DiffBind](https://bioconductor.org/packages/devel/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf)
+
+
+```{r, eslimma}
+library(limma)
+dp_bed = trackplot::diffpeak(summary_list = bed_summary, condition = "condition", num = "dBET", den = "dmso")
+print(dp_bed)
+```
+
+Above output can be plotted with `volcanoplot`. 
+
+```{r, volcano}
+trackplot::volcano_plot(res = dp_bed)
+```
+
+Here, the treatment effect is quite strong and lack of replicates makes it as a not so nice example. 
+
+
+## Sessioninfo
+
+```{r}
+sessionInfo()
+```
+
