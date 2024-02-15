@@ -1,0 +1,25 @@
+trackplot requires bwtool - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`) or a directory under the PATH. 
+
+
+* For macOS: Please download the pre-build binary from here: https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1 
+Make it executable with `chmod +x bwtool`. macOS gatekeeper might complain that it can not run the binary downloaded from the internet. If so, allow (https://support.apple.com/en-us/HT202491) it in the security settings. 
+
+* For centOS or debian: Follow the below compilation instructions
+
+git clone 'https://github.com/CRG-Barcelona/bwtool'
+git clone 'https://github.com/CRG-Barcelona/libbeato'
+git clone https://github.com/madler/zlib
+
+cd libbeato/
+git checkout 0c30432af9c7e1e09ba065ad3b2bc042baa54dc2
+./configure
+make
+
+cd ../zlib
+./configure
+make
+
+cd ../bwtool
+./configure CFLAGS='-I../libbeato -I../zlib' LDFLAGS='-L../libbeato/jkweb -L../libbeato/beato -L../zlib'
+make
+
