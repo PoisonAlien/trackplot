@@ -1790,17 +1790,13 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     chr = paste0("chr", chr)
   }
   
-  cmd = paste0(
-    "mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",
-    refBuild,
-    " -e 'select chrom, chromStart, chromEnd, name, gieStain from ",  tblName, " WHERE chrom =\"",
-    chr,
-    "\"'"
-  )
-  message(paste0("Extracting cytobands from UCSC:\n", "    chromosome: ", chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  message(paste0("Extracting cytobands from UCSC:\n", "    chromosome: ", chr, "\n", "    build: ", refBuild))
+  mydb = RMySQL::dbConnect(RMySQL::MySQL(), user = "genome", db = refBuild, host = "genome-mysql.soe.ucsc.edu")
+  cmd = paste0("select chrom, chromStart, chromEnd, name, gieStain from ", tblName, " WHERE chrom = '", chr, "'")
+  cyto = DBI::dbGetQuery(mydb, cmd)
   
-  cyto = data.table::fread(cmd = cmd, colClasses = c("character", "numeric", "numeric", "character", "character"))
   colnames(cyto) = c("chr", "start", "end", "band", "stain")
+  data.table::setDT(cyto)
   data.table::setkey(x = cyto, chr, start, end)
   
   #Color codes from https://github.com/jianhong/trackViewer (Thank you..)
@@ -1865,16 +1861,16 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   ucsc_tbls = .get_ucsc_hmm_tbls()
   tbl = match.arg(arg = tbl, choices = ucsc_tbls$TableName)
   
-  .check_mysql()
+  message(paste0("Extracting chromHMM from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild))
+  mydb = RMySQL::dbConnect(RMySQL::MySQL(), user = "genome", db = refBuild, host = "genome-mysql.soe.ucsc.edu")
+  cmd = paste0("select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom = '", chr, "'")
+  ucsc = DBI::dbGetQuery(mydb, cmd)
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
-  message(paste0("Extracting chromHMM from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
-  #system(command = cmd)
-  ucsc = data.table::fread(cmd = cmd)
   if(nrow(ucsc) == 0){
     message("No features found within the requested loci!")
     return(NULL)
   }
+  data.table::setDT(x = ucsc)
   colnames(ucsc) = c("chr", "start", "end", "name")
   if(!grepl(pattern = "^chr", x = chr)){
     ucsc[, chr := gsub(pattern = "^chr", replacement = "", x = chr)]
@@ -1888,13 +1884,13 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
 }
 
 .extract_geneModel_ucsc_bySymbol = function(genesymbol, refBuild){
-  .check_mysql()
-  op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
-  message(paste0("Extracting gene models from UCSC:\n", "    Gene: ", genesymbol, "\n", "    build: ", refBuild, "\n    query: ", cmd))
+  message(paste0("Extracting gene models from UCSC:\n", "    Gene: ", genesymbol, "\n", "    build: ", refBuild))
+  mydb = RMySQL::dbConnect(RMySQL::MySQL(), user = "genome", db = refBuild, host = "genome-mysql.soe.ucsc.edu")
+  cmd = paste0("select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 = '", genesymbol, "'")
+  ucsc = DBI::dbGetQuery(mydb, cmd)
+  data.table::setDT(ucsc)
   
-  ucsc = data.table::fread(cmd = cmd, sep = "\t")
   if(nrow(ucsc) == 0){
     message("No features found within the requested loci!")
     return(NULL)
@@ -1906,8 +1902,6 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
 }
 
 .extract_geneModel_ucsc = function(chr, start = NULL, end = NULL, refBuild = "hg19", txname = NULL, genename = NULL){
-  .check_mysql()
-  op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
   
   if(!grepl(pattern = "^chr", x = chr)){
     message("Adding chr prefix to target chromosome for UCSC query..")
@@ -1916,10 +1910,12 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     tar_chr = chr
   }
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
-  message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
-  #system(command = cmd)
-  ucsc = data.table::fread(cmd = cmd)
+  message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild))
+  mydb = RMySQL::dbConnect(RMySQL::MySQL(), user = "genome", db = refBuild, host = "genome-mysql.soe.ucsc.edu")
+  cmd = paste0("select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom = '", tar_chr, "'")
+  ucsc = DBI::dbGetQuery(mydb, cmd)
+  data.table::setDT(ucsc)
+  
   if(nrow(ucsc) == 0){
     message("No features found within the requested loci!")
     return(NULL)
@@ -2129,10 +2125,11 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   temp_op_bed = tempfile(pattern = "profileplot_ucsc", tmpdir = op_dir, fileext = ".bed")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
-  message(paste0("Extracting gene models from UCSC:\n", "    build: ", refBuild, "\n    query: ", cmd))
-  #system(command = cmd)
-  ucsc = data.table::fread(cmd = cmd)
+  message(paste0("Extracting gene models from UCSC:\n", "    build: ", refBuild))
+  mydb = RMySQL::dbConnect(RMySQL::MySQL(), user = "genome", db = refBuild, host = "genome-mysql.soe.ucsc.edu")
+  cmd = paste0("select chrom, txStart, txEnd, strand, name, name2 from refGene")
+  ucsc = DBI::dbGetQuery(mydb, cmd)
+  data.table::setDT(ucsc)
   colnames(ucsc) = c("chr", "start", "end", "strand", "tx_id", "gene_id")
   
   main_contigs = paste0("chr", c(1:22, "X", "Y"))

@@ -185,7 +185,6 @@ track_plot(
   summary_list = t_loci,
   col = track_cols,
   peaks = tf_beds,
-  peaks_track_names = c("NANOG", "OCT4"),
   genename = c("POU5F1", "TCF19"),
   chromHMM = h1_chrHMM,
   chromHMM_names = "H1", layout_ord = c("h", "g", "c", "b", "p")
