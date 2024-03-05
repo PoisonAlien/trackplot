@@ -248,7 +248,7 @@ Setting `ucsc_assembly = TRUE` will fetch refseq transcripts from UCSC browser a
 
 ```{r, profilePlot_tss, fig.height=5, fig.width=5}
 #Extract signals from bigWig files around refseq transcripts
-pe_refseq = trackplot::profile_extract(colData = bws, ucsc_assembly = TRUE, startFrom = 'start', up = 1500, down = 1500)
+pe_refseq = trackplot::profile_extract(colData = bws, ucsc_assembly = TRUE, startFrom = 'start', up = 1500, down = 1500, nthreads = 1)
 #Estimate mean signal
 ps_refseq = trackplot::profile_summarize(sig_list = pe_refseq) 
 ```
@@ -266,7 +266,7 @@ Providing a BED file or a data.frame in BED format..
 #BRD4 binding sites 
 bed = "/Users/anandmayakonda/Documents/Documents_MacBookPro_work/github/data.nosync/GSE99183_U87_BRD4/GSM2634756_U87_BRD4_peaks.narrowPeak"
 #Center and extend 1500 both ways from the peak center
-pe_bed = trackplot::profile_extract(colData = bws, bed = bed, startFrom = "center", up = 1500, down = 1500, nthreads = 4)
+pe_bed = trackplot::profile_extract(colData = bws, bed = bed, startFrom = "center", up = 1500, down = 1500, nthreads = 1)
 #Estimate mean signal
 ps_bed = trackplot::profile_summarize(sig_list = pe_bed) 
 ```
@@ -290,8 +290,8 @@ trackplot::profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
 Extract peak intensities. Similar to `profile_extract`, setting `ucsc_assembly = TRUE` will fetch refseq transcripts from UCSC browser and extracts peak intensities aroud the TSS or TES.
 
 ```{r, es}
-tss_summary = trackplot::extract_summary(colData = bws, ucsc_assembly = TRUE, up = 1500, down = 1500) #For TSS regions
-bed_summary = trackplot::extract_summary(colData = bws, bed = bed, up = 1500, down = 1500) #For BED regions
+tss_summary = trackplot::extract_summary(colData = bws, ucsc_assembly = TRUE, up = 1500, down = 1500, nthreads = 1) #For TSS regions
+bed_summary = trackplot::extract_summary(colData = bws, bed = bed, up = 1500, down = 1500, nthreads = 1) #For BED regions
 ```
 
 output includes peak intensities across all the sites

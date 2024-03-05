@@ -1,10 +1,12 @@
 trackplot requires bwtool - a command line tool for processing bigWig files. Install and move the binary to a PATH (e.g; `/usr/local/bin`) or a directory under the PATH. 
 
+| bwtool installation |
+-------------------------
+bwtool is a free C software that can be downloaded from https://github.com/CRG-Barcelona/bwtool. Please follow the following instructions for your OS to install bwtool properly on your machine.
 
-* For macOS: Please download the pre-build binary from here: https://www.dropbox.com/s/kajx9ya6erzyrim/bwtool_macOS.tar.gz?dl=1 
-Make it executable with `chmod +x bwtool`. macOS gatekeeper might complain that it can not run the binary downloaded from the internet. If so, allow (https://support.apple.com/en-us/HT202491) it in the security settings. 
-
-* For centOS or debian: Follow the below compilation instructions
+| Linux |
+----------
+(a) Follow below compilation instructions.
 
 git clone 'https://github.com/CRG-Barcelona/bwtool'
 git clone 'https://github.com/CRG-Barcelona/libbeato'
@@ -23,3 +25,14 @@ cd ../bwtool
 ./configure CFLAGS='-I../libbeato -I../zlib' LDFLAGS='-L../libbeato/jkweb -L../libbeato/beato -L../zlib'
 make
 
+| MacOS |
+----------
+For macOS, you must either install Xcode or the command-line tools package (if you dont have it installed already). See here for an example: https://mac.install.guide/commandlinetools/4
+Once installed, follow the same compilation instructions from (a).
+
+| Windows |
+----------
+Unfortunately bwtool is not compilable on windows
+
+(b) Once bwtool is successfully compiled, copy the "bwtool" binary to "/usr/local/bin" or to a directory under the PATH to make bwtool available for trackplot. 
+(c) As a quick test for a successful installation type "bwtool --version" in the Linux console or mac terminal.
