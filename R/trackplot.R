@@ -1027,10 +1027,10 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
   
   if(top_profile){
     lo_mat = matrix(data = 1:(nsamps*2), nrow = 2, ncol = nsamps)
-    lo = layout(mat = lo_mat, heights = c(top_profile_h, 9))
+    lo = graphics::layout(mat = lo_mat, heights = c(top_profile_h, 9))
   }else{
     lo_mat = matrix(data = 1:nsamps, nrow = 1)
-    lo = layout(mat = lo_mat)
+    lo = graphics::layout(mat = lo_mat)
   }
   
   for(i in 1:nsamps){
@@ -1408,7 +1408,7 @@ pca_plot = function(summary_list = NULL, top = 1000, log2 = FALSE, xpc = "PC1", 
   #print(head(pca_dat))
   
   if(show_cree){
-    lo = layout(mat = matrix(data = c(1, 2), ncol = 2))
+    lo = graphics::layout(mat = matrix(data = c(1, 2), ncol = 2))
   }
   
   grid_cols = "gray90"
@@ -1504,7 +1504,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   pie.col = pie.cols[rownames(homer.anno.stats)]
   
-  #layout(mat = matrix(data = c(1, 2), nrow = 2), heights = c(4, 1.25))
+  #graphics::layout(mat = matrix(data = c(1, 2), nrow = 2), heights = c(4, 1.25))
   par(mar = c(2, 4, 5, 3))
   b = barplot(height = as.matrix(homer.anno.stats), col = pie.col, horiz = TRUE,
               las = 2, axes = FALSE, names.arg = rep(NA, ncol(homer.anno.stats)), border = pie.cols)
@@ -1647,27 +1647,27 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   }
 
   if(case == 1){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 2){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 3){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 4){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 5){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 6){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 7){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 8){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 9){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 10){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }else if(case == 11){
-    lo = layout(mat = matrix(data = data), heights = lo_heights)
+    lo = graphics::layout(mat = matrix(data = data), heights = lo_heights)
   }
   
   lo_h_ord[lord]
