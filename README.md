@@ -1,7 +1,6 @@
 ## trackplot - Fast and easy visualisation of bigWig files in R
 
 <!-- badges: start -->
-[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/poisonalien/trackplot.svg)](https://github.com/poisonalien/trackplot/issues)
 <!-- badges: end -->
 
@@ -286,20 +285,20 @@ profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
 
 
 
-***PSA*** If you find the tool useful, consider starring this repository or upvoting this [Biostars thread](https://www.biostars.org/p/475853/) so that more poeple can find it :)
+***PSA*** If you find the tool useful, consider starring this repository or up voting this [Biostars thread](https://www.biostars.org/p/475853/) so that more poeple can find it :)
 
 ### Caveat
 
  * Windows OS is not supported
- 
-![](https://media.giphy.com/media/cKJjGbH7R5KKcJIR5u/giphy.gif)
 
 
 ### Citation
 
-If you find the script useful consider [citing bwtool](https://academic.oup.com/bioinformatics/article/30/11/1618/282756)
+If you find the script useful consider citing [trackplot](https://academic.oup.com/bioinformaticsadvances/article/4/1/vbae031/7616126) and [bwtool](https://academic.oup.com/bioinformatics/article/30/11/1618/282756)
 
-*Pohl A, Beato M. bwtool: a tool for bigWig files. Bioinformatics. 2014 Jun 1;30(11):1618-9. doi: 10.1093/bioinformatics/btu056. Epub 2014 Jan 30. PMID: [24489365](https://pubmed.ncbi.nlm.nih.gov/24489365/); PMCID: PMC4029031.*
+**_Mayakonda, Anand, and Frank Westermann. Trackplot: a fast and lightweight R script for epigenomic enrichment plots. Bioinformatics advances vol. 4,1 vbae031. 28 Feb. 2024. PMID: [38476298](https://pubmed.ncbi.nlm.nih.gov/38476298/)_**
+
+**_Pohl A, Beato M. bwtool: a tool for bigWig files. Bioinformatics. 2014 Jun 1;30(11):1618-9. doi: 10.1093/bioinformatics/btu056. Epub 2014 Jan 30. PMID: [24489365](https://pubmed.ncbi.nlm.nih.gov/24489365/)_**
 
 ### Acknowledgements 
 
