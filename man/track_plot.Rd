@@ -19,10 +19,11 @@ track_plot(
   track_names = NULL,
   track_names_pos = 0,
   track_names_to_left = FALSE,
+  track_overlay = FALSE,
   regions = NULL,
   collapse_txs = TRUE,
-  boxcol = "#192A561A",
-  boxcolalpha = 0.2,
+  boxcol = "#ffc41a",
+  boxcolalpha = 0.4,
   chromHMM = NULL,
   chromHMM_cols = NULL,
   chromHMM_names = NULL,
@@ -68,6 +69,8 @@ track_plot(
 \item{track_names_pos}{Default 0 (corresponds to left corner)}
 
 \item{track_names_to_left}{If TRUE, track names are shown to the left of the margin. Default FALSE, plots on top as a title}
+
+\item{track_overlay}{Draws all bigWigs in a single track as a line plot}
 
 \item{regions}{genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.}
 

@@ -6,6 +6,9 @@
 # Copyright (c) 2020 Anand Mayakonda <anandmt3@gmail.com>
 #
 # Change log:
+# Version: 1.6.00 [2024-10-28]
+#   * Added argument `track_overlay` for a single track with line plot. #14
+#   * Bug fix: color alpha differs between tracks. Issue: #34
 # Version: 1.5.10 [2024-02-14]
 #   * Added argument `layout_ord` and `bw_ord` to `track_plot()` re-order the overall tracks and bigWig tracks
 #   * Added `xlab` and `ylab` arguments to `profile_plot()`
@@ -300,6 +303,7 @@ track_summarize = function(summary_list = NULL, condition = NULL, stat = "mean")
 #' @param track_names Default NULL
 #' @param track_names_pos Default 0 (corresponds to left corner)
 #' @param track_names_to_left If TRUE, track names are shown to the left of the margin. Default FALSE, plots on top as a title
+#' @param track_overlay Draws all bigWigs in a single track as a line plot 
 #' @param regions genomic regions to highlight. A data.frame with at-least three columns containing chr, start and end positions.
 #' @param boxcol color for highlighted region. Default "#192A561A"
 #' @param boxcolalpha Default 0.5
@@ -339,10 +343,11 @@ track_plot = function(summary_list = NULL,
                       track_names = NULL,
                       track_names_pos = 0,
                       track_names_to_left = FALSE,
+                      track_overlay = FALSE,
                       regions = NULL,
                       collapse_txs = TRUE,
-                      boxcol = "#192A561A",
-                      boxcolalpha = 0.2,
+                      boxcol = "#ffc41a",
+                      boxcolalpha = 0.4,
                       chromHMM = NULL,
                       chromHMM_cols = NULL,
                       chromHMM_names = NULL,
@@ -469,7 +474,11 @@ track_plot = function(summary_list = NULL,
     plot_height_min = round(plot_height_min, digits = 2)  
   }
   
-  ntracks = length(summary_list)
+  if(is_bw & track_overlay){
+    ntracks = 1
+  }else{
+    ntracks = length(summary_list)  
+  }
   
   lo = .make_layout(ntracks = ntracks, ntracks_h = bw_track_height, cytoband = show_ideogram, cytoband_h = cytoband_track_height, genemodel = draw_gene_track, 
                genemodel_h = gene_track_height, chrHMM = any(!is.null(ucscChromHMM), !is.null(chromHMM)), chrHMM_h = chromHMM_track_height, loci = !is.null(peaks), 
@@ -526,61 +535,85 @@ track_plot = function(summary_list = NULL,
   }
   
   #Draw bigWig signals
+  boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
   if(is_bw){
-    for(idx in 1:length(summary_list)){
-      x = summary_list[[idx]]
+    if(track_overlay){
+      
       if(show_axis){
         par(mar = c(0.5, left_mar, 2, 1))
       }else{
         par(mar = c(0.5, left_mar, 2, 1))  
       }
       
-      plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
-      #If there is no signal, just add the track names and go to next
-      if(nrow(x) == 0){
-        if(track_names_to_left){
-          text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
-          #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
-          #title(main = , adj = track_names_pos, font.main = 3)  
-        }else{
-          title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+      plot(NA, xlim = c(start, end), ylim = c(min(plot_height_min), max(plot_height)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+      for(idx in 1:length(summary_list)){
+        x = summary_list[[idx]]
+        if(nrow(x) == 0){
+          if(track_names_to_left){
+            text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
+            #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
+            #title(main = , adj = track_names_pos, font.main = 3)  
+          }else{
+            title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+          }
+          next
         }
-        next
+        points(x = x$start, y = x$max, col = col[idx], type = "l")
       }
-      rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
-      if(show_axis){
-        axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
-      }else{
-        text(x = start, y = plot_height[idx], labels = paste0("[", plot_height_min[idx], "-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
-      }
-      #plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
       
       if(plot_regions){
         # boxcol = "#192a56"
-        boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
-        if(nrow(regions) > 0){
-          for(i in 1:nrow(regions)){
-            if(idx == length(summary_list)){
-              #If its a last plot, draw rectangle till 0
-              rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
-            }else if (idx == 1){
-              if(ncol(regions) > 3){
-                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
-              }else{
-                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
-              }
-              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
-            }else{
-              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)  
-            }
-          }
+        if(nrow(x) > 0){
+          rect(xleft = regions[, startpos], ybottom = 0, xright = regions[, endpos], ytop = max(plot_height), col = boxcol, border = NA, xpd = TRUE)  
         }
       }
       
-      if(track_names_to_left){
-        text(x = start, y = (plot_height_min[idx] + plot_height[idx])/2, labels = names(summary_list)[idx], adj = 1.1, cex = gene_fsize, xpd = TRUE)
-      }else{
-        title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)  
+      if(show_axis){
+        axis(side = 2, at = c(min(plot_height_min), max(plot_height)), las = 2)
+      }
+      legend(x = "topright", legend = names(summary_list), col = col, pch = "-")
+    }else{
+      for(idx in 1:length(summary_list)){
+        x = summary_list[[idx]]
+        if(show_axis){
+          par(mar = c(0.5, left_mar, 2, 1))
+        }else{
+          par(mar = c(0.5, left_mar, 2, 1))  
+        }
+        
+        plot(NA, xlim = c(start, end), ylim = c(plot_height_min[idx], plot_height[idx]), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+        #If there is no signal, just add the track names and go to next
+        if(nrow(x) == 0){
+          if(track_names_to_left){
+            text(x = start, y = 0.5, labels = names(summary_list)[idx], adj = 1, cex = gene_fsize, xpd = TRUE)
+            #mtext(text = names(summary_list)[idx], side = 2, line = -2, outer = TRUE, xpd = TRUE, las = 2, adj = 0)
+            #title(main = , adj = track_names_pos, font.main = 3)  
+          }else{
+            title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)
+          }
+          next
+        }
+        rect(xleft = x$start, ybottom = 0, xright = x$end, ytop = x$max, col = col[idx], border = col[idx])
+        
+        if(show_axis){
+          axis(side = 2, at = c(plot_height_min[idx], plot_height[idx]), las = 2)  
+        }else{
+          text(x = start, y = plot_height[idx], labels = paste0("[", plot_height_min[idx], "-", plot_height[idx], "]"), adj = 0, xpd = TRUE)
+        }
+        #plot(NA, xlim = c(start, end), ylim = c(0, nrow(regions)), frame.plot = FALSE, axes = FALSE, xlab = NA, ylab = NA)
+        
+        if(plot_regions){
+          # boxcol = "#192a56"
+          if(nrow(x) > 0){
+            rect(xleft = regions[, startpos], ybottom = 0, xright = regions[, endpos], ytop = max(plot_height), col = boxcol, border = NA, xpd = TRUE)  
+          }
+        }
+        
+        if(track_names_to_left){
+          text(x = start, y = (plot_height_min[idx] + plot_height[idx])/2, labels = names(summary_list)[idx], adj = 1.1, cex = gene_fsize, xpd = TRUE)
+        }else{
+          title(main = names(summary_list)[idx], adj = track_names_pos, font.main = 3)  
+        }
       }
     }
   }else{
@@ -613,20 +646,8 @@ track_plot = function(summary_list = NULL,
         # boxcol = "#192a56"
         boxcol = grDevices::adjustcolor(boxcol, alpha.f = boxcolalpha)
         if(nrow(regions) > 0){
-          for(i in 1:nrow(regions)){
-            if(idx == length(summary_list)){
-              #If its a last plot, draw rectangle till 0
-              rect(xleft = regions[i, startpos], ybottom = 0, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)
-            }else if (idx == 1){
-              if(ncol(regions) > 3){
-                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = regions[i, 4], adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
-              }else{
-                text(x = mean(c(regions[i, startpos], regions[i, endpos])), y = plot_height[idx]+(plot_height[idx]*0.1), labels = paste0(regions[i, startpos], "-", regions[i, endpos]), adj = 0.5, xpd = TRUE, font = 1, cex = 1.2)
-              }
-              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx], col = boxcol, border = NA, xpd = TRUE)
-            }else{
-              rect(xleft = regions[i, startpos], ybottom = -10, xright = regions[i, endpos], ytop = plot_height[idx]+10, col = boxcol, border = NA, xpd = TRUE)  
-            }
+          if(nrow(x) > 0){
+            rect(xleft = regions[, startpos], ybottom = 0, xright = regions[, endpos], ytop = max(plot_height), col = boxcol, border = NA, xpd = TRUE)  
           }
         }
       }
@@ -1622,8 +1643,11 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   ### Re-organize the layout by user specification
   dt = data.table::data.table(name = plot_ord$name, ord = plot_ord$ord, ord_req = plot_ord$ord_req)
+  
   dt$n_tracks = ifelse(test = dt$name == 'b', yes = ntracks, no = 1)
+  #print(dt)
   dt_s = split(dt, dt$n_tracks)
+  #print(dt_s)
   if(length(dt_s) > 1){
     dt_mult = dt_s[[2]]
     dt_sing = dt_s[[1]]
@@ -1639,7 +1663,11 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     dt = dt[order(ord_req)]
     data = dt$ord_req4
   }else{
-    dt = data.table::data.table(name = rep(dt$name, dt$n_tracks), ord = dt$ord, ord_req = dt$ord_req, ord_req2 = seq(dt$ord_req, dt$ord_req + dt$n_tracks -1 , 1), n_tracks = dt$n_tracks)
+    #ifelse(test = dt$n_tracks > 1, )
+    #print(dt)
+    dt = data.table::data.table(name = rep(dt$name, dt$n_tracks), ord = dt$ord, ord_req = dt$ord_req, ord_req2 = dt$ord_req, n_tracks = dt$n_tracks)
+    #print(dt)
+    
     dt = split(dt, dt$ord) |> data.table::rbindlist()
     dt[, ord_req4 := 1:nrow(dt)]
     dt = dt[order(ord_req)]
@@ -1685,6 +1713,8 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   }
   window_dat$chr = chr
   window_dat = window_dat[, .(chr, start, end)]
+  
+  print(window_dat)
   
   op_dir = paste0(op_dir, "/")
   

@@ -1,0 +1,10 @@
+bibentry(
+  bibtype  = "Article",
+  title    = "Trackplot: a fast and lightweight R script for epigenomic enrichment plots",
+  author   =  personList(as.person("Anand Mayakonda"),
+                       as.person("Frank Westermann")),
+  journal  = "Bioinformatics Advances",
+  year     = "2024",
+  volume   = "4",
+  doi      = "doi.org/10.1093/bioadv/vbae031"
+)

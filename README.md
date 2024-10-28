@@ -48,6 +48,14 @@ Why `trackplot`?
 
 * For centOS or debian: Follow these [compilation instructions](https://gist.github.com/PoisonAlien/e19b482ac6146bfb03142a0de1c4fbc8).
 
+### Citation
+
+If you find the script useful consider citing [trackplot](https://academic.oup.com/bioinformaticsadvances/article/4/1/vbae031/7616126) and [bwtool](https://academic.oup.com/bioinformatics/article/30/11/1618/282756)
+
+**_Mayakonda A, and Frank Westermann. Trackplot: a fast and lightweight R script for epigenomic enrichment plots. Bioinformatics advances vol. 4,1 vbae031. 28 Feb. 2024. PMID: [38476298](https://pubmed.ncbi.nlm.nih.gov/38476298/)_**
+
+**_Pohl A, Beato M. bwtool: a tool for bigWig files. Bioinformatics. 2014 Jun 1;30(11):1618-9. doi: 10.1093/bioinformatics/btu056. Epub 2014 Jan 30. PMID: [24489365](https://pubmed.ncbi.nlm.nih.gov/24489365/)_**
+
 ## Usage
 
 Simple usage - Make a table of all the bigWig files to be analysed with `read_coldata()` and pass it to the downstream functions.
@@ -112,6 +120,17 @@ track_plot(summary_list = t,
 ```
 
 ![](https://github.com/PoisonAlien/trackplot/assets/8164062/a0911998-aae8-4de1-96f5-18e278d19d80)
+
+#### Collapse all tracks into a single track
+
+Use `track_overlay = TRUE` to overlay all tracks into a single line track
+
+```r
+track_plot(summary_list = t, col = track_cols, show_ideogram = FALSE, track_overlay = TRUE)
+```
+
+![](https://github.com/user-attachments/assets/d286f159-8950-4209-a985-fa3ba7103c53)
+
 
 #### Heighilight regions of interest (any bed files would do)
 
@@ -291,14 +310,6 @@ profile_heatmap(mat_list = pe_bed, top_profile = TRUE, zmaxs = 0.8)
 
  * Windows OS is not supported
 
-
-### Citation
-
-If you find the script useful consider citing [trackplot](https://academic.oup.com/bioinformaticsadvances/article/4/1/vbae031/7616126) and [bwtool](https://academic.oup.com/bioinformatics/article/30/11/1618/282756)
-
-**_Mayakonda, Anand, and Frank Westermann. Trackplot: a fast and lightweight R script for epigenomic enrichment plots. Bioinformatics advances vol. 4,1 vbae031. 28 Feb. 2024. PMID: [38476298](https://pubmed.ncbi.nlm.nih.gov/38476298/)_**
-
-**_Pohl A, Beato M. bwtool: a tool for bigWig files. Bioinformatics. 2014 Jun 1;30(11):1618-9. doi: 10.1093/bioinformatics/btu056. Epub 2014 Jan 30. PMID: [24489365](https://pubmed.ncbi.nlm.nih.gov/24489365/)_**
 
 ### Acknowledgements 
 

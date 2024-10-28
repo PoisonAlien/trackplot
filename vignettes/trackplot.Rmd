@@ -115,6 +115,13 @@ track_cols = c("#d35400","#d35400","#2980b9","#2980b9","#2980b9", "#27ae60","#27
 track_plot(summary_list = t_loci, col = track_cols)
 ```
 
+### Collapse all tracks into a single track
+
+```{r}
+track_plot(summary_list = t_loci, track_overlay = T, col = track_cols, show_ideogram = FALSE, genename = c("POU5F1", "TCF19"), gene_track_height = 1)
+```
+
+
 ### Heighlight sites at the top
 
 Using BED files or data.frame in BED format to heightlight target regions of interest
@@ -129,6 +136,8 @@ track_plot(
   peaks_track_names = c("NANOG", "OCT4")
 )
 ```
+
+
 
 ### Show only specific genes
 
@@ -189,6 +198,21 @@ track_plot(
   genename = c("POU5F1", "TCF19"),
   chromHMM = h1_chrHMM,
   chromHMM_names = "H1", layout_ord = c("h", "g", "c", "b", "p")
+)
+```
+
+## Overlay tracks
+
+```{r}
+#Re-organize the layout in the order chromHMM track, gene track, cytoband track, bigWig tracks and peak track.
+track_plot(
+  summary_list = t_loci,
+  col = track_cols,
+  peaks = tf_beds,
+  peaks_track_names = c("NANOG", "OCT4"),
+  genename = c("POU5F1", "TCF19"),
+  chromHMM = h1_chrHMM,
+  chromHMM_names = "H1", layout_ord = c("h", "g", "c", "b", "p"), track_overlay = TRUE
 )
 ```
 
