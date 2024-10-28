@@ -1514,21 +1514,21 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   homer.anno.stats = data.table::rbindlist(l = homer.anno.stats, idcol = "Sample")
   homer.anno.stats = data.table::dcast(data = homer.anno.stats, Annotation ~ Sample, value.var = "fract", fill = 0)
   data.table::setDF(x = homer.anno.stats, rownames = homer.anno.stats$Annotation)
-  homer.anno.stats =homer.anno.stats[,-1]
+  homer.anno.stats =homer.anno.stats[,-1, drop = FALSE]
   
   pie.cols = c('3pUTR' = '#E7298A', '5pUTR' = '#D95F02', 'Intergenic' = '#BEBADA',
                'TTS' = '#FB8072', 'exon' = '#80B1D3', 'intron' = '#FDB462',
                'non-coding' = '#FFFFB3',
                'NA' = 'gray70', 'promoter-TSS' = '#1B9E77')
   
-  homer.anno.stats = homer.anno.stats[names(pie.cols)[names(pie.cols) %in% rownames(homer.anno.stats)],,]
+  homer.anno.stats = homer.anno.stats[names(pie.cols)[names(pie.cols) %in% rownames(homer.anno.stats)],,drop = FALSE]
   
   pie.col = pie.cols[rownames(homer.anno.stats)]
   
   #graphics::layout(mat = matrix(data = c(1, 2), nrow = 2), heights = c(4, 1.25))
   par(mar = c(2, 4, 5, 3))
   b = barplot(height = as.matrix(homer.anno.stats), col = pie.col, horiz = TRUE,
-              las = 2, axes = FALSE, names.arg = rep(NA, ncol(homer.anno.stats)), border = pie.cols)
+              las = 2, axes = FALSE, names.arg = rep(NA, ncol(homer.anno.stats)), border = "#34495e")
   axis(side = 1, at = seq(0, 1, 0.25), font = 2, lwd = 2)
   mtext(text = npeaks[colnames(x = homer.anno.stats)], side = 4, at = b, las = 2, font = 4, adj = -0.2)
   mtext(text = colnames(homer.anno.stats), side = 2, at = b, las = 2, adj = 1, font = 2)
