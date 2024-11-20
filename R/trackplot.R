@@ -123,6 +123,7 @@ read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_t
 #' @param build Reference genome build. Default hg38
 #' @param padding Extend locus on both sides by this many bps. 
 #' @param ideoTblName Table name for ideogram. Default `cytoBand`
+#' @param use_conda Default NULL. If set to TRUE, uses conda to install required packages.
 #' @import data.table
 #' @examples
 #' bigWigs = system.file("extdata", "bw", package = "trackplot") |> list.files(pattern = "\\.bw$", full.names = TRUE) 
@@ -130,7 +131,7 @@ read_coldata = function(bws = NULL, sample_names = NULL, build = "hg38", input_t
 #' oct4_loci = "chr6:31125776-31144789"
 #' t = track_extract(colData = cd, loci = oct4_loci, build = "hg19")
 #' @export
-track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0, ideoTblName = "cytoBand"){
+track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10, nthreads = 1, query_ucsc = TRUE, gtf = NULL, build = "hg38", padding = 0, ideoTblName = "cytoBand",use_conda = NULL){
   
   if(is.null(colData)){
     stop("Missing colData. Use read_coldata() to generate one.")
@@ -145,7 +146,7 @@ track_extract = function(colData = NULL, loci = NULL, gene = NULL, binsize = 10,
 
   .check_windows()
   if(input_bw){
-    .check_bwtool()  
+    .check_bwtool(use_conda = use_conda)  
   }
   
   .check_dt()
@@ -808,13 +809,14 @@ track_plot = function(summary_list = NULL,
 #' @param ucsc_assembly If `bed` file not provided, setting `ucsc_assembly` to TRUE will fetch transcripts from UCSC genome browser.
 #' @param pc_genes Use only protein coding genes when `ucsc_assembly` is used. Default TRUE
 #' @param nthreads Default 4
+#' @param use_conda Default NULL. If you have conda installed, you can set this to envs to use conda's `bwtool` 
 #' @seealso \code{\link{profile_summarize}} \code{\link{profile_plot}} \code{\link{profile_heatmap}}
 #' @export
 
 profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, startFrom = "start", binSize = 50,
-                           up = 2500, down = 2500, pc_genes = TRUE, nthreads = 4){
+                           up = 2500, down = 2500, pc_genes = TRUE, nthreads = 4,use_conda = NULL){
   .check_windows()
-  .check_bwtool(warn = FALSE)
+  .check_bwtool(warn = FALSE,use_conda = use_conda)
   .check_dt()
   
   if(is.null(colData)){
@@ -844,8 +846,8 @@ profile_extract = function(colData = NULL, bed = NULL, ucsc_assembly = TRUE, sta
   }
   
   message("Extracting signals..")
-  mats = parallel::mclapply(bigWigs, function(x){
-    .bwt_mats(bw = x, binSize = binSize, bed = bed, size = paste0(up, ":", down), startFrom = startFrom, op_dir = op_dir)
+  mats = parallel::mclapply(bigWigs, function(x,use_conda = use_conda){
+    .bwt_mats(bw = x, binSize = binSize, bed = bed, size = paste0(up, ":", down), startFrom = startFrom, op_dir = op_dir,use_conda = use_conda )
   }, mc.cores = nthreads)
   
   mats = as.character(unlist(x = mats))
@@ -1128,16 +1130,17 @@ profile_heatmap = function(mat_list, sortBy = "mean", col_pal = "Blues", revpal 
 #' @param up extend upstream by this many bps from `startFrom`. Default 2500
 #' @param down extend downstream by this many bps from `startFrom`. Default 2500
 #' @param nthreads Default 4
+#' @param use_conda Default NULL. If not NULL, will use conda to install required packages.
 #' @export
 extract_summary = function(colData, bed = NULL, ucsc_assembly = TRUE, startFrom = "start", binSize = 50,
-                           up = 2500, down = 2500, pc_genes = TRUE, nthreads = 4){
+                           up = 2500, down = 2500, pc_genes = TRUE, nthreads = 4,use_conda = NULL){
   
   if(is.null(colData)){
     stop("Missing colData. Use read_coldata() to generate one.")
   }
   
   .check_windows()
-  .check_bwtool()
+  .check_bwtool(use_conda = use_conda)
   .check_dt()
   
   bigWigs = colData$bw_files
@@ -1168,10 +1171,15 @@ extract_summary = function(colData, bed = NULL, ucsc_assembly = TRUE, startFrom 
   }
   
   message("Extracting summaries..")
-  summaries = parallel::mclapply(seq_along(bigWigs), FUN = function(idx){
+  summaries = parallel::mclapply(seq_along(bigWigs), FUN = function(idx,use_conda = use_conda){
     bw = bigWigs[idx]
     bn = custom_names[idx]
-    cmd = paste("bwtool summary -with-sum -keep-bed -header", bed, bw, paste0(op_dir, bn, ".summary"))
+    if (!is.null(use_conda)){
+      cmd_conda = paste("conda run -n", use_conda)
+    } else{
+      cmd_conda = ""
+    }
+    cmd = paste(cmd_conda,"bwtool summary -with-sum -keep-bed -header", bed, bw, paste0(op_dir, bn, ".summary"))
     system(command = cmd, intern = TRUE)
     paste0(op_dir, bn, ".summary")
   }, mc.cores = nthreads)
@@ -1701,7 +1709,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   lo_h_ord[lord]
 }
 
-.gen_windows = function(chr = NA, start, end, window_size = 50, op_dir = getwd()){
+.gen_windows = function(chr = NA, start, end, window_size = 50, op_dir = getwd(),use_conda = NULL){
   #chr = "chr19"; start = 15348301; end = 15391262; window_size = 50; op_dir = getwd()
   message(paste0("Generating windows ", "[", window_size, " bp window size]"))
   
@@ -1741,7 +1749,12 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   summaries = parallel::mclapply(bigWigs, FUN = function(bw){
     bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "", x = basename(bw))
     message(paste0("    Processing ", bn, " .."))
-    cmd = paste("bwtool summary -with-sum -keep-bed -header", bedSimple, bw, paste0(op_dir, bn, ".summary"))
+    if (!is.null(use_conda)){
+      cmd_conda = paste("conda run -n", use_conda)
+    } else{
+      cmd_conda = ""
+    }
+    cmd = paste(cmd_conda,"bwtool summary -with-sum -keep-bed -header", bedSimple, bw, paste0(op_dir, bn, ".summary"))
     system(command = cmd, intern = TRUE)
     paste0(op_dir, bn, ".summary")
   }, mc.cores = nthreads)
@@ -1821,7 +1834,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   }
   
   cmd = paste0(
-    "mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",
+    "mariadb --user genome --host genome-mysql.soe.ucsc.edu -A -P 3306 -NAD  ",
     refBuild,
     " -e 'select chrom, chromStart, chromEnd, name, gieStain from ",  tblName, " WHERE chrom =\"",
     chr,
@@ -1897,7 +1910,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   .check_mysql()
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
+  cmd = paste0("mariadb --user genome --host genome-mysql.soe.ucsc.edu -A -P 3306 -NAD ",  refBuild,  " -e 'select chrom, chromStart, chromEnd, name from ", tbl, " WHERE chrom =\"", tar_chr, "\"'")
   message(paste0("Extracting chromHMM from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
@@ -1921,7 +1934,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   .check_mysql()
   op_file = tempfile(pattern = "ucsc", fileext = ".tsv")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
+  cmd = paste0("mariadb --user genome --host genome-mysql.soe.ucsc.edu -A -P 3306 -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE name2 =\"", genesymbol, "\"'")
   message(paste0("Extracting gene models from UCSC:\n", "    Gene: ", genesymbol, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   
   ucsc = data.table::fread(cmd = cmd, sep = "\t")
@@ -1946,7 +1959,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
     tar_chr = chr
   }
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
+  cmd = paste0("mariadb --user genome --host genome-mysql.soe.ucsc.edu -A -P 3306 -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2, exonStarts, exonEnds from refGene WHERE chrom =\"", tar_chr, "\"'")
   message(paste0("Extracting gene models from UCSC:\n", "    chromosome: ", tar_chr, "\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
@@ -2159,7 +2172,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   
   temp_op_bed = tempfile(pattern = "profileplot_ucsc", tmpdir = op_dir, fileext = ".bed")
   
-  cmd = paste0("mysql --user genome --host genome-mysql.soe.ucsc.edu -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
+  cmd = paste0("mariadb --user genome --host genome-mysql.soe.ucsc.edu -A -P 3306 -NAD ",  refBuild,  " -e 'select chrom, txStart, txEnd, strand, name, name2 from refGene'")
   message(paste0("Extracting gene models from UCSC:\n", "    build: ", refBuild, "\n    query: ", cmd))
   #system(command = cmd)
   ucsc = data.table::fread(cmd = cmd)
@@ -2264,20 +2277,24 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   return(temp_op_bed)
 }
 
-.bwt_mats = function(bw, binSize, bed, size, startFrom, op_dir){
+.bwt_mats = function(bw, binSize, bed, size, startFrom, op_dir,use_conda = NULL){
   
   bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "",
             x = basename(bw), ignore.case = TRUE)
   message(paste0("Processing ", bn, ".."))
   
   bw = gsub(pattern = " ", replacement = "\\ ", x = bw, fixed = TRUE) #Change spaces with \ for unix style paths
-  
+  if (!is.null(use_conda)){
+      cmd_conda = paste("conda run -n", use_conda)
+    } else{
+      cmd_conda = ""
+    }
   if(startFrom == "start"){
-    cmd = paste0("bwtool matrix -starts -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))  
+    cmd = paste0( cmd_conda,"bwtool matrix -starts -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))  
   }else if(startFrom == "end"){
-    cmd = paste0("bwtool matrix -ends -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+    cmd = paste0( cmd_conda,"bwtool matrix -ends -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
   }else{
-    cmd = paste0("bwtool matrix -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
+    cmd = paste0( cmd_conda,"bwtool matrix -tiled-averages=", binSize, " ", size, " " , bed , " ", bw, " ", paste0(op_dir, "/", bn, ".matrix"))
   }
   print(cmd)
 
@@ -2364,12 +2381,16 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   mat
 }
 
-.extract_summary = function(bw, binSize, bed, op_dir){
+.extract_summary = function(bw, binSize, bed, op_dir,use_conda = NULL){
   bn = gsub(pattern = "\\.bw$|\\.bigWig$", replacement = "",
             x = basename(bw), ignore.case = TRUE)
   message(paste0("    Processing ", bn, ".."))
-  
-  cmd = paste("bwtool summary -with-sum -keep-bed -header", bedSimple, bw, paste0(op_dir, bn, ".summary"))
+  if (!is.null(use_conda)){
+    cmd_conda = paste0("conda run -n ", use_conda)
+  }else {
+    cmd_conda = ""
+  }
+  cmd = paste(cmd_conda,"bwtool summary -with-sum -keep-bed -header", bedSimple, bw, paste0(op_dir, bn, ".summary"))
   paste0(op_dir, "/", bn, ".summary")
 }
 
@@ -2382,8 +2403,17 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
   data.table::data.table(chr, start, end)
 }
 
-.check_bwtool = function(warn = FALSE){
-  check = as.character(Sys.which(names = 'bwtool'))[1]
+.check_bwtool = function(warn = FALSE, use_conda = NULL){
+  if (!is.null(use_conda)){
+    check <- try(system(paste0("conda run -n ", use_conda, " bwtool -h")))
+    if (class(check) == "try-error"){
+      check = as.character(Sys.which(names = 'bwtool'))[1]
+    }else{
+      check <- "conda mod"
+    }
+  } else{
+    check = as.character(Sys.which(names = 'bwtool'))[1]
+  }
   if(check != ""){
     if(warn){
       message("Checking for bwtool installation")
@@ -2397,7 +2427,7 @@ summarize_homer_annots = function(anno, sample_names = NULL, legend_font_size = 
 }
 
 .check_mysql = function(warn = FALSE){
-  check = as.character(Sys.which(names = 'mysql'))[1]
+  check = as.character(Sys.which(names = 'mariadb'))[1]
   if(check != ""){
     if(warn){
       message("Checking for mysql installation")
